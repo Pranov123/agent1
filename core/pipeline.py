@@ -412,6 +412,16 @@ class Pipeline:
         path = self.sm.save()
         console.print(f"\n[bold green]✅ Session complete — saved to {path}[/bold green]")
         return self.sm.summary()
+        # generate PDF artefact
+        try:
+            from core.artefact_generator import ArtefactGenerator
+            generator = ArtefactGenerator(path)
+            pdf_path  = generator.generate()
+            console.print(f"[bold green]📄 PDF artefact generated: {pdf_path}[/bold green]")
+        except Exception as e:
+            console.print(f"[yellow]⚠ PDF generation failed: {e}[/yellow]")
+
+        return self.sm.summary()
 
     # ── Stage 1A ──────────────────────────────────────────────
     def _run_stage1a(self, user_input: str) -> dict:
