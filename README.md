@@ -55,6 +55,11 @@ Your input
     │
     ├─── HITL 1: Intent Checkpoint
     │         YOU answer clarification questions (max 3 rounds)
+    |
+    ├─── Stage 1C: Requirement Enrichment
+    │         Enriches each requirement with clarification answers,
+    │         updates confidence levels, fills dependencies,
+    │         adds acceptance criteria, extracts key decisions
     │
     ├─── Stage 2: Scope Definition
     │         Organises into MVP / nice-to-have / future / non-goals
@@ -356,7 +361,7 @@ agent1/
 ├── config.py                # All settings — API key, models, thresholds
 ├── core/
 │   ├── __init__.py          # Client factory
-│   ├── pipeline.py          # Main orchestrator — runs all 5 stages
+│   ├── pipeline.py          # Main orchestrator — runs all 6 stages (1A, 1B, HITL1, 1C, 2, 3)
 │   ├── session_manager.py   # Tracks requirements, states, flags, versions
 │   └── state_machine.py     # Enforces valid state transitions
 ├── prompts/                 # Individual stage scripts for testing
