@@ -1,6 +1,5 @@
 import json
 import sys
-import os
 from pathlib import Path
 from datetime import datetime
 from rich.console import Console
@@ -17,9 +16,11 @@ import config
 
 console = Console()
 
-class Displayer:
-    """Handles all rich table display after each stage."""
 
+# ══════════════════════════════════════════════════════════════
+# DISPLAYER
+# ══════════════════════════════════════════════════════════════
+class Displayer:
     def __init__(self, console: Console):
         self.console = console
 
@@ -36,13 +37,8 @@ class Displayer:
         t.add_column("Confidence",  width=10)
         t.add_column("Description", width=40)
         for r in reqs:
-            p_color = {
-                "Critical":"red","High":"orange3",
-                "Medium":"yellow","Low":"green"
-            }.get(r.get("priority",""), "white")
-            c_color = {
-                "HIGH":"green","MEDIUM":"yellow","LOW":"red"
-            }.get(r.get("confidence",""), "white")
+            p_color = {"Critical":"red","High":"orange3","Medium":"yellow","Low":"green"}.get(r.get("priority",""),"white")
+            c_color = {"HIGH":"green","MEDIUM":"yellow","LOW":"red"}.get(r.get("confidence",""),"white")
             t.add_row(
                 r.get("uid","—"),
                 r.get("title",""),
@@ -65,7 +61,7 @@ class Displayer:
             t = Table(show_header=True, header_style="bold red")
             t.add_column("ID",       width=6)
             t.add_column("Priority", width=8)
-            t.add_column("Description",          width=38)
+            t.add_column("Description",           width=38)
             t.add_column("Clarification Question", width=44)
             for m in missing:
                 p_color = {"P1":"red","P2":"orange3","P3":"yellow"}.get(m.get("priority",""),"white")
@@ -82,7 +78,7 @@ class Displayer:
             t = Table(show_header=True, header_style="bold orange3")
             t.add_column("ID",       width=6)
             t.add_column("Priority", width=8)
-            t.add_column("Description",          width=38)
+            t.add_column("Description",           width=38)
             t.add_column("Clarification Question", width=44)
             for c in conflicts:
                 p_color = {"P1":"red","P2":"orange3","P3":"yellow"}.get(c.get("priority",""),"white")
@@ -99,7 +95,7 @@ class Displayer:
             t = Table(show_header=True, header_style="bold yellow")
             t.add_column("ID",       width=6)
             t.add_column("Priority", width=8)
-            t.add_column("Description",          width=38)
+            t.add_column("Description",           width=38)
             t.add_column("Clarification Question", width=44)
             for v in vague:
                 p_color = {"P1":"red","P2":"orange3","P3":"yellow"}.get(v.get("priority",""),"white")
@@ -151,11 +147,55 @@ class Displayer:
                 )
             self.console.print(t)
 
+    def stage1c(self, result: dict):
+        enriched = result.get("enriched_requirements", [])
+        if not enriched:
+            return
+
+        self.console.print(f"\n[bold green]── ENRICHED REQUIREMENTS ({len(enriched)}) ──[/bold green]")
+        for r in enriched:
+            c_color = {"HIGH":"green","MEDIUM":"yellow","LOW":"red"}.get(r.get("confidence",""),"white")
+            self.console.print(
+                f"\n  [bold cyan]{r.get('uid','')}[/bold cyan]"
+            )
+            self.console.print(
+                f"  [bold]Description:[/bold] {r.get('enriched_description','')[:120]}"
+            )
+            self.console.print(
+                f"  [bold]Confidence:[/bold]  [{c_color}]{r.get('confidence','')}[/{c_color}]"
+            )
+            deps = r.get("dependencies", [])
+            if deps:
+                self.console.print(f"  [bold]Dependencies:[/bold] {', '.join(deps)}")
+            criteria = r.get("acceptance_criteria", [])
+            if criteria:
+                self.console.print(f"  [bold]Acceptance criteria:[/bold]")
+                for c in criteria:
+                    self.console.print(f"    [green]✓[/green] {c}")
+            ambs = r.get("related_ambiguities", [])
+            if ambs:
+                self.console.print(f"  [bold]Related ambiguities:[/bold] {', '.join(ambs)}")
+
+        decisions = result.get("decisions_extracted", [])
+        if decisions:
+            self.console.print(f"\n[bold purple]── DECISIONS EXTRACTED ({len(decisions)}) ──[/bold purple]")
+            t = Table(show_header=True, header_style="bold purple")
+            t.add_column("Decision",      width=40)
+            t.add_column("Rationale",     width=40)
+            t.add_column("Affected UIDs", width=20)
+            for d in decisions:
+                t.add_row(
+                    d.get("decision","")[:70],
+                    d.get("rationale","")[:70],
+                    ", ".join(d.get("affected_uids",[]))
+                )
+            self.console.print(t)
+
     def stage2(self, result: dict):
         bucket_config = [
-            ("mvp_scope",       "MVP SCOPE",        "bold green",  "green"),
-            ("nice_to_have",    "NICE TO HAVE",     "bold yellow", "yellow"),
-            ("future_features", "FUTURE FEATURES",  "bold cyan",   "cyan"),
+            ("mvp_scope",       "MVP SCOPE",       "bold green",  "green"),
+            ("nice_to_have",    "NICE TO HAVE",    "bold yellow", "yellow"),
+            ("future_features", "FUTURE FEATURES", "bold cyan",   "cyan"),
         ]
         for key, label, header_style, _ in bucket_config:
             items = result.get(key, [])
@@ -169,10 +209,7 @@ class Displayer:
             t.add_column("Description", width=42)
             t.add_column("Reason",      width=28)
             for item in items:
-                p_color = {
-                    "Critical":"red","High":"orange3",
-                    "Medium":"yellow","Low":"green"
-                }.get(item.get("priority",""), "white")
+                p_color = {"Critical":"red","High":"orange3","Medium":"yellow","Low":"green"}.get(item.get("priority",""),"white")
                 t.add_row(
                     item.get("uid",""),
                     item.get("title",""),
@@ -216,8 +253,6 @@ class Displayer:
             ))
 
     def stage3(self, result: dict):
-        from rich.table import Table
-
         contradictions = result.get("contradictions", [])
         if contradictions:
             self.console.print(f"\n[bold red]── CONTRADICTIONS ({len(contradictions)}) ──[/bold red]")
@@ -279,9 +314,7 @@ class Displayer:
             for factor, weight in factor_weights.items():
                 score        = factors.get(factor, 0)
                 contribution = score * weight
-                veto_flag    = " ⚠" if factor in [
-                    "architectural_expansion","cross_cutting_complexity"
-                ] and score >= 8 else ""
+                veto_flag    = " ⚠" if factor in ["architectural_expansion","cross_cutting_complexity"] and score >= 8 else ""
                 t.add_row(
                     factor.replace("_"," ").title() + veto_flag,
                     str(score),
@@ -289,13 +322,10 @@ class Displayer:
                     f"{contribution:.2f}"
                 )
             self.console.print(t)
-            self.console.print(f"\n[bold]Weighted SSS:[/bold] {sss}/100  "
-                               f"[bold]Severity:[/bold] [{tier_color}]{tier}[/{tier_color}]")
+            self.console.print(f"\n[bold]Weighted SSS:[/bold] {sss}/100  [bold]Severity:[/bold] [{tier_color}]{tier}[/{tier_color}]")
             if veto:
-                self.console.print(
-                    f"[bold red]⚠ HARD VETO: {scope.get('hard_veto_reason','')}[/bold red]"
-                )
-            self.console.print(f"[dim]{scope.get('assessment','')}[/dim]")
+                self.console.print(f"[bold red]⚠ HARD VETO: {scope.get('hard_veto_reason','')}[/bold red]")
+            self.console.print(f"\n[dim]{scope.get('assessment','')}[/dim]")
 
         bias = result.get("bias_audit", [])
         if bias:
@@ -306,12 +336,7 @@ class Displayer:
             t.add_column("Description",    width=40)
             t.add_column("Recommendation", width=28)
             for b in bias:
-                t.add_row(
-                    b.get("id",""),
-                    b.get("type",""),
-                    b.get("description","")[:72],
-                    b.get("recommendation","")[:50]
-                )
+                t.add_row(b.get("id",""), b.get("type",""), b.get("description","")[:72], b.get("recommendation","")[:50])
             self.console.print(t)
 
         ethics = result.get("product_ethics", [])
@@ -323,12 +348,7 @@ class Displayer:
             t.add_column("Description",    width=40)
             t.add_column("Recommendation", width=28)
             for e in ethics:
-                t.add_row(
-                    e.get("id",""),
-                    e.get("type",""),
-                    e.get("description","")[:72],
-                    e.get("recommendation","")[:50]
-                )
+                t.add_row(e.get("id",""), e.get("type",""), e.get("description","")[:72], e.get("recommendation","")[:50])
             self.console.print(t)
 
         ngc = result.get("non_goal_conflicts", [])
@@ -341,13 +361,7 @@ class Displayer:
             t.add_column("Description",    width=36)
             t.add_column("Recommendation", width=24)
             for n in ngc:
-                t.add_row(
-                    n.get("id",""),
-                    n.get("requirement_uid",""),
-                    n.get("non_goal_uid",""),
-                    n.get("description","")[:60],
-                    n.get("recommendation","")[:40]
-                )
+                t.add_row(n.get("id",""), n.get("requirement_uid",""), n.get("non_goal_uid",""), n.get("description","")[:60], n.get("recommendation","")[:40])
             self.console.print(t)
 
         divergence = result.get("intent_divergence", {})
@@ -365,6 +379,10 @@ class Displayer:
                 border_style="purple"
             ))
 
+
+# ══════════════════════════════════════════════════════════════
+# PIPELINE
+# ══════════════════════════════════════════════════════════════
 class Pipeline:
     def __init__(self):
         self.sm               = SessionManager()
@@ -383,6 +401,7 @@ class Pipeline:
         stage1b      = self._run_stage1b(user_input, stage1a)
         self._load_requirements_from_1a(stage1a)
         hitl1_result = self._run_hitl1(stage1b)
+        stage1c      = self._run_stage1c(stage1a, stage1b, hitl1_result)
         stage2       = self._run_stage2(stage1a, hitl1_result)
         self._load_scope_from_stage2(stage2)
         stage3       = self._run_stage3(stage2, user_input, hitl1_result)
@@ -523,10 +542,10 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             console.print("[green]No ambiguities — skipping HITL 1[/green]")
             return {"resolutions": [], "assumptions_fired": []}
 
-        resolved_ids     = []
-        all_resolutions  = []
-        all_assumptions  = []
-        open_items       = all_items.copy()
+        resolved_ids    = []
+        all_resolutions = []
+        all_assumptions = []
+        open_items      = all_items.copy()
 
         for round_num in range(1, config.MAX_CLARIFICATION_ROUNDS + 1):
             if not open_items:
@@ -671,6 +690,113 @@ OUTPUT FORMAT — valid JSON only:
 
         return self._parse_json(response.choices[0].message.content)
 
+    # ── Stage 1C — Requirement Enrichment ─────────────────────
+    def _run_stage1c(self, stage1a: dict, stage1b: dict,
+                     hitl1: dict) -> dict:
+        console.print(Rule("[bold cyan]Stage 1C — Requirement Enrichment[/bold cyan]"))
+
+        SYSTEM_PROMPT = """You are the Requirement Enrichment engine for Agent 1.
+
+YOUR JOB:
+You receive the original extracted requirements AND the clarifications from HITL 1.
+Enrich each requirement with everything learned during clarification.
+
+FOR EACH REQUIREMENT YOU MUST:
+1. Update the description to reflect clarifications — not the vague original, the clarified version
+2. Update confidence — if a LOW confidence requirement was clarified, upgrade it to HIGH
+3. Fill in dependencies — which other requirement UIDs does this one depend on?
+4. Link related ambiguities — which M/C/V items from Stage 1B relate to this requirement?
+5. Add source context — the broader sentence from the original input, not just a fragment
+6. Add acceptance criteria — 2-4 testable conditions that define when this requirement is done
+
+STRICT RULES:
+1. Never invent information not present in original input or HITL 1 clarifications
+2. Dependencies must reference actual UIDs from the requirement list
+3. Acceptance criteria must be testable — "User can X" or "System does X when Y" format
+4. If a requirement was not clarified, keep original description but still fill dependencies and criteria
+5. Confidence upgrades to HIGH only if HITL 1 directly answered a question about this requirement
+6. Extract key decisions as named decisions with rationale
+
+OUTPUT FORMAT — valid JSON only, no preamble:
+{
+  "enriched_requirements": [
+    {
+      "uid": "REQ-xxx",
+      "enriched_description": "full clarified description incorporating HITL 1 answers",
+      "confidence": "HIGH/MEDIUM/LOW",
+      "dependencies": ["REQ-yyy"],
+      "related_ambiguities": ["M1", "V2"],
+      "source_context": "broader phrase from original input",
+      "acceptance_criteria": [
+        "User can create a new habit with a name and frequency",
+        "Habit data persists after app restart"
+      ],
+      "enrichment_notes": "what changed and why"
+    }
+  ],
+  "decisions_extracted": [
+    {
+      "decision": "short decision statement",
+      "rationale": "why this decision was made",
+      "affected_uids": ["REQ-xxx"]
+    }
+  ]
+}"""
+
+        requirements_text = json.dumps(stage1a.get("requirements", []), indent=2)
+        ambiguities_text  = json.dumps({
+            "missing":   stage1b.get("missing_requirements", []),
+            "conflicts": stage1b.get("conflicts", []),
+            "vague":     stage1b.get("vague_statements", [])
+        }, indent=2)
+        resolutions_text  = json.dumps(hitl1.get("resolutions", []), indent=2)
+        assumptions_text  = json.dumps(hitl1.get("assumptions_fired", []), indent=2)
+
+        response = self.client.chat.completions.create(
+            model=self.primary_model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": (
+                    f"Original requirements from Stage 1A:\n{requirements_text}\n\n"
+                    f"Ambiguities detected in Stage 1B:\n{ambiguities_text}\n\n"
+                    f"HITL 1 clarifications and resolutions:\n{resolutions_text}\n\n"
+                    f"Stated assumptions (if any):\n{assumptions_text}\n\n"
+                    f"Enrich every requirement. Fill dependencies, acceptance criteria, "
+                    f"update confidence. Extract key decisions."
+                )}
+            ],
+            temperature=0.1
+        )
+
+        result = self._parse_json(response.choices[0].message.content)
+        self.sm.store_stage_output("stage1c", result)
+
+        enriched_count = 0
+        for enrichment in result.get("enriched_requirements", []):
+            uid = enrichment.get("uid")
+            if uid and uid in self.sm.requirements:
+                self.sm.enrich_requirement(uid, enrichment)
+                enriched_count += 1
+
+        for decision in result.get("decisions_extracted", []):
+            self.sm.add_decision(
+                decision.get("decision", ""),
+                decision.get("rationale", ""),
+                source="HITL1",
+                affected_uids=decision.get("affected_uids", [])
+            )
+
+        for assumption in hitl1.get("assumptions_fired", []):
+            self.sm.add_assumption(
+                assumption.get("ambiguity_ref", ""),
+                assumption.get("assumption", ""),
+                assumption.get("reason", "")
+            )
+
+        console.print(f"[green]✓ Enriched {enriched_count} requirements[/green]")
+        self.display.stage1c(result)
+        return result
+
     # ── Stage 2 ───────────────────────────────────────────────
     def _run_stage2(self, stage1a: dict, hitl1: dict) -> dict:
         console.print(Rule("[bold cyan]Stage 2 — Scope Definition[/bold cyan]"))
@@ -680,15 +806,24 @@ OUTPUT FORMAT — valid JSON only:
 Organise clarified requirements into four buckets:
 1. MVP SCOPE — minimum viable product, critical features only
 2. NICE TO HAVE — valuable but not launch-blocking
-3. FUTURE FEATURES — explicitly deferred
+3. FUTURE FEATURES — explicitly deferred or behind paywall
 4. EXPLICIT NON-GOALS — deliberately excluded, with NG-UIDs
 
 RULES:
 1. Every requirement must appear in exactly one bucket
 2. Use HITL 1 resolutions to make placement decisions
-3. Non-goals must only come from actual HITL 1 decisions — never invent them
+3. Each requirement keeps its original UID from Stage 1A
 4. New requirements surfaced during clarification get new UIDs
-5. Each requirement keeps its original UID from Stage 1A
+
+NON-GOALS RULES — READ CAREFULLY:
+- ONLY create non-goals from explicit statements made during HITL 1
+- A non-goal MUST quote the specific HITL 1 answer that justifies it
+- NEVER create a non-goal because something was not mentioned
+- NEVER infer exclusions from silence — absence of evidence is NOT evidence of exclusion
+- VALID: user said "iOS only" → non-goal "No Android app"
+- VALID: user said "no server storage" → non-goal "No server-side storage"
+- INVALID: user never mentioned Android → do NOT create "No Android app"
+- If you cannot quote a specific HITL 1 answer for a non-goal, do not create it
 
 OUTPUT FORMAT — valid JSON only, no preamble:
 {
@@ -705,7 +840,7 @@ OUTPUT FORMAT — valid JSON only, no preamble:
   "non_goals": [
     {
       "uid":"NG-YYYYMMDD-001","title":"","description":"",
-      "reason":"","status":"ACTIVE","source":""
+      "reason":"","status":"ACTIVE","source":"exact HITL 1 quote"
     }
   ],
   "new_requirements_surfaced": [],
@@ -720,32 +855,22 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": (
-                        f"Requirements from Stage 1A:\n{requirements_text}\n\n"
-                        f"HITL 1 resolutions:\n{resolutions_text}\n\n"
-                        f"Define the full scope using these EXACT placement rules:\n\n"
-                        f"MVP RULES:\n"
-                        f"- Core functionality without which the app cannot launch\n"
-                        f"- Free access constraint belongs in MVP\n"
-                        f"- Monetization/revenue model belongs in MVP — the app cannot sustain without it\n"
-                        f"- Offline functionality if clearly stated belongs in MVP\n"
-                        f"- Authentication if required belongs in MVP\n\n"
-                        f"NICE TO HAVE RULES:\n"
-                        f"- Social features that enhance but don't define the product\n"
-                        f"- Features the user hedged with 'maybe' that are NOT behind a paywall\n\n"
-                        f"FUTURE FEATURES RULES:\n"
-                        f"- Features explicitly placed behind a paywall in HITL 1\n"
-                        f"- AI features if HITL 1 said they are paid\n"
-                        f"- Health integrations if HITL 1 said they are paid\n\n"
-                        f"NON-GOALS RULES:\n"
-                        f"- MUST generate non-goals from HITL 1 platform decisions\n"
-                        f"- MUST generate non-goals from HITL 1 data storage decisions\n"
-                        f"- Example: if HITL 1 said iOS only — non-goal is No Android app\n"
-                        f"- Example: if HITL 1 said no server storage — non-goal is No server-side data storage\n"
-                        f"- Example: if HITL 1 said read-only health data — non-goal is No writing to Apple Health\n"
-                        f"- Do NOT invent non-goals that were never discussed\n\n"
-                        f"CRITICAL: Read the HITL 1 resolutions carefully for paywall decisions. "
-                        f"Anything explicitly stated as paid/premium/behind paywall goes to FUTURE, not NICE TO HAVE.\n\n"
-                        f"Make sure ALL requirements appear in exactly one bucket."
+                    f"Requirements from Stage 1A:\n{requirements_text}\n\n"
+                    f"HITL 1 resolutions:\n{resolutions_text}\n\n"
+                    f"Define the full scope.\n\n"
+                    f"MVP PLACEMENT RULES:\n"
+                    f"- Core functionality without which the app cannot launch\n"
+                    f"- Free access constraint belongs in MVP\n"
+                    f"- Monetization/revenue model belongs in MVP\n"
+                    f"- Offline functionality if clearly stated belongs in MVP\n\n"
+                    f"FUTURE PLACEMENT RULES:\n"
+                    f"- Features explicitly placed behind a paywall in HITL 1\n"
+                    f"- AI features if HITL 1 said they are paid\n"
+                    f"- Health integrations if HITL 1 said they are paid\n\n"
+                    f"NON-GOALS: Only from explicit HITL 1 statements. "
+                    f"Never infer from silence. Never create a non-goal unless "
+                    f"you can quote the exact HITL 1 answer that justifies it.\n\n"
+                    f"Make sure ALL requirements appear in exactly one bucket."
                 )}
             ],
             temperature=0.1
@@ -766,8 +891,9 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         return result
 
     # ── Stage 3 ───────────────────────────────────────────────
-    def _run_stage3(self, stage2: dict, original_input: str, hitl1: dict) -> dict:
-        console.print(Rule("[bold cyan]Stage 3 — DeepSeek R1 Validation[/bold cyan]"))
+    def _run_stage3(self, stage2: dict, original_input: str,
+                    hitl1: dict) -> dict:
+        console.print(Rule("[bold cyan]Stage 3 — Validation Layer[/bold cyan]"))
 
         SYSTEM_PROMPT = """You are the Validation Layer for Agent 1.
 You are adversarial. Your job is to find problems.
@@ -784,9 +910,14 @@ CHECK SEVEN THINGS:
 6. NON-GOAL CONFLICTS — requirements that violate active non-goals
 7. INTENT DIVERGENCE — does scope match original user intent
 
+CRITICAL RULE — RESOLVED CONFLICTS:
+You will be given a list of conflicts that were already resolved during HITL 1.
+Do NOT re-flag these as contradictions or missing requirements.
+They are settled decisions. Treat them as ground truth.
+
 RULES:
 - You VALIDATE, never APPROVE
-- Be adversarial — a clean report with no findings is a failure
+- Be adversarial — a clean report with no findings needs strong justification
 - Every finding must reference specific UIDs
 - weighted_sss = single number only
 
@@ -815,14 +946,22 @@ OUTPUT FORMAT — valid JSON only, no preamble:
   "requirements_advanced": []
 }"""
 
+        resolved_items = [
+            r for r in hitl1.get("resolutions", [])
+            if r.get("status") == "RESOLVED"
+        ]
+
         response = self.client.chat.completions.create(
             model=self.validation_model,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": (
                     f"Original input:\n\"\"\"{original_input}\"\"\"\n\n"
-                    f"HITL 1 resolutions:\n"
-                    f"{json.dumps(hitl1.get('resolutions',[]), indent=2)}\n\n"
+                    f"RESOLVED CONFLICTS — do NOT re-flag these:\n"
+                    f"{json.dumps(resolved_items, indent=2)}\n\n"
+                    f"The above were explicitly resolved during HITL 1. "
+                    f"They are settled decisions — do not flag them as contradictions "
+                    f"or missing requirements.\n\n"
                     f"MVP:\n{json.dumps(stage2.get('mvp_scope',[]), indent=2)}\n\n"
                     f"Nice to have:\n{json.dumps(stage2.get('nice_to_have',[]), indent=2)}\n\n"
                     f"Future:\n{json.dumps(stage2.get('future_features',[]), indent=2)}\n\n"
@@ -859,7 +998,6 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         notes       = input("  Notes (optional): ").strip()
 
         if action == "approve":
-            # advance all requirements in HUMAN_REVIEW to APPROVED then LOCKED
             approved_count = 0
             blocked_uids   = []
 
@@ -868,10 +1006,10 @@ OUTPUT FORMAT — valid JSON only, no preamble:
                     if self.sm.has_blocking_flags(uid):
                         blocked_uids.append(uid)
                         continue
-                    self.sm.requirements[uid]["status"] = "APPROVED"
+                    self.sm.requirements[uid]["status"]      = "APPROVED"
                     self.sm.requirements[uid]["approved_by"] = reviewer_id
                     self.sm.requirements[uid]["updated_at"]  = datetime.now().isoformat()
-                    self.sm.requirements[uid]["status"] = "LOCKED"
+                    self.sm.requirements[uid]["status"]      = "LOCKED"
                     approved_count += 1
 
             self.sm.log_hitl2_action(reviewer_id, "APPROVED", [], notes)
@@ -895,7 +1033,6 @@ OUTPUT FORMAT — valid JSON only, no preamble:
     def _display_hitl2_brief(self, stage3: dict):
         console.print("\n[bold]── SCOPE FOR REVIEW ──[/bold]")
 
-        # MVP table
         mvp = self.sm.get_by_bucket("MVP")
         if mvp:
             console.print(f"\n[bold green]MVP SCOPE ({len(mvp)} items)[/bold green]")
@@ -906,10 +1043,7 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             t.add_column("Description", width=44)
             t.add_column("Reason",      width=28)
             for r in mvp:
-                p_color = {
-                    "Critical":"red","High":"orange3",
-                    "Medium":"yellow","Low":"green"
-                }.get(r.get("priority",""), "white")
+                p_color = {"Critical":"red","High":"orange3","Medium":"yellow","Low":"green"}.get(r.get("priority",""),"white")
                 t.add_row(
                     r.get("uid",""),
                     r.get("title",""),
@@ -919,7 +1053,6 @@ OUTPUT FORMAT — valid JSON only, no preamble:
                 )
             console.print(t)
 
-        # Nice to have table
         nth = self.sm.get_by_bucket("NICE_TO_HAVE")
         if nth:
             console.print(f"\n[bold yellow]NICE TO HAVE ({len(nth)} items)[/bold yellow]")
@@ -930,16 +1063,9 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             t.add_column("Description", width=44)
             t.add_column("Reason",      width=28)
             for r in nth:
-                t.add_row(
-                    r.get("uid",""),
-                    r.get("title",""),
-                    r.get("priority",""),
-                    r.get("description","")[:80],
-                    r.get("placement_reason","")[:50]
-                )
+                t.add_row(r.get("uid",""), r.get("title",""), r.get("priority",""), r.get("description","")[:80], r.get("placement_reason","")[:50])
             console.print(t)
 
-        # Future features table
         future = self.sm.get_by_bucket("FUTURE")
         if future:
             console.print(f"\n[bold cyan]FUTURE FEATURES ({len(future)} items)[/bold cyan]")
@@ -950,16 +1076,9 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             t.add_column("Description", width=44)
             t.add_column("Reason",      width=28)
             for r in future:
-                t.add_row(
-                    r.get("uid",""),
-                    r.get("title",""),
-                    r.get("priority",""),
-                    r.get("description","")[:80],
-                    r.get("placement_reason","")[:50]
-                )
+                t.add_row(r.get("uid",""), r.get("title",""), r.get("priority",""), r.get("description","")[:80], r.get("placement_reason","")[:50])
             console.print(t)
 
-        # Non-goals table
         if self.sm.non_goals:
             console.print(f"\n[bold red]EXPLICIT NON-GOALS ({len(self.sm.non_goals)} items)[/bold red]")
             t = Table(show_header=True, header_style="bold red")
@@ -968,15 +1087,9 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             t.add_column("Description", width=38)
             t.add_column("Reason",      width=34)
             for ng in self.sm.non_goals.values():
-                t.add_row(
-                    ng.get("uid",""),
-                    ng.get("title",""),
-                    ng.get("description","")[:60],
-                    ng.get("reason","")[:55]
-                )
+                t.add_row(ng.get("uid",""), ng.get("title",""), ng.get("description","")[:60], ng.get("reason","")[:55])
             console.print(t)
 
-        # Validation flags summary
         cons = stage3.get("contradictions", [])
         miss = stage3.get("missing_requirements", [])
         bias = stage3.get("bias_audit", [])
@@ -987,10 +1100,7 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         tier_color = {"Minor":"green","Medium":"yellow","Major":"red"}.get(tier,"white")
 
         console.print(f"\n[bold]── VALIDATION FLAGS ──[/bold]")
-        console.print(
-            f"[bold]Scope severity:[/bold]       "
-            f"[{tier_color}]{tier} (SSS: {sss.get('weighted_sss',0)}/100)[/{tier_color}]"
-        )
+        console.print(f"[bold]Scope severity:[/bold]       [{tier_color}]{tier} (SSS: {sss.get('weighted_sss',0)}/100)[/{tier_color}]")
         console.print(f"[bold]Contradictions:[/bold]       {len(cons)}")
         console.print(f"[bold]Missing requirements:[/bold] {len(miss)}")
         console.print(f"[bold]Bias flags:[/bold]           {len(bias)}")
@@ -1000,17 +1110,17 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         if cons:
             console.print("\n[bold red]Contradictions:[/bold red]")
             for c in cons:
-                console.print(
-                    f"  • {c.get('id','')} [{c.get('severity','')}] "
-                    f"{c.get('description','')[:100]}"
-                )
+                console.print(f"  • {c.get('id','')} [{c.get('severity','')}] {c.get('description','')[:100]}")
 
         if miss:
             console.print("\n[bold orange3]Missing requirements:[/bold orange3]")
             for m in miss:
-                console.print(
-                    f"  • {m.get('id','')} — {m.get('description','')[:100]}"
-                )
+                console.print(f"  • {m.get('id','')} — {m.get('description','')[:100]}")
+
+        if self.sm.decisions:
+            console.print(f"\n[bold purple]── KEY DECISIONS ({len(self.sm.decisions)}) ──[/bold purple]")
+            for d in self.sm.decisions:
+                console.print(f"  • {d.get('decision','')} — {d.get('rationale','')[:80]}")
 
         if self.sm.non_goals:
             console.print(f"\n[bold red]Standing non-goals (cannot be violated):[/bold red]")
@@ -1034,11 +1144,10 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             for req in stage2.get(key, []):
                 uid = req.get("uid")
                 if uid and uid in self.sm.requirements:
-                    self.sm.requirements[uid]["scope_bucket"]      = bucket
-                    self.sm.requirements[uid]["placement_reason"]  = req.get("placement_reason","")
-                    self.sm.requirements[uid]["status"]            = "CLARIFIED"
+                    self.sm.requirements[uid]["scope_bucket"]     = bucket
+                    self.sm.requirements[uid]["placement_reason"] = req.get("placement_reason","")
+                    self.sm.requirements[uid]["status"]           = "CLARIFIED"
                 else:
-                    # not in session yet — add it
                     req["scope_bucket"] = bucket
                     new_uid = self.sm.add_requirement(req)
                     self.sm.requirements[new_uid]["status"] = "CLARIFIED"
@@ -1060,32 +1169,27 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         for c in stage3.get("contradictions", []):
             for uid in c.get("req_uids", []):
                 if uid in self.sm.requirements:
-                    self.sm.add_flag(uid, "CONTRADICTION", c.get("description",""),
-                                     blocking=False, source="stage3")
+                    self.sm.add_flag(uid, "CONTRADICTION", c.get("description",""), blocking=False, source="stage3")
 
         for ngc in stage3.get("non_goal_conflicts", []):
             uid = ngc.get("requirement_uid")
             if uid and uid in self.sm.requirements:
-                self.sm.add_flag(uid, "NON_GOAL_CONFLICT", ngc.get("description",""),
-                                 blocking=True, source="stage3")
+                self.sm.add_flag(uid, "NON_GOAL_CONFLICT", ngc.get("description",""), blocking=True, source="stage3")
 
         for b in stage3.get("bias_audit", []):
             for uid in b.get("affected_uids", []):
                 if uid in self.sm.requirements:
-                    self.sm.add_flag(uid, "BIAS_AUDIT", b.get("description",""),
-                                     blocking=False, source="stage3")
+                    self.sm.add_flag(uid, "BIAS_AUDIT", b.get("description",""), blocking=False, source="stage3")
 
         for e in stage3.get("product_ethics", []):
             for uid in e.get("affected_uids", []):
                 if uid in self.sm.requirements:
-                    self.sm.add_flag(uid, "PRODUCT_ETHICS", e.get("description",""),
-                                     blocking=False, source="stage3")
+                    self.sm.add_flag(uid, "PRODUCT_ETHICS", e.get("description",""), blocking=False, source="stage3")
 
     # ── Advance to validated ──────────────────────────────────
     def _advance_to_validated(self, stage3: dict):
         for uid, req in self.sm.requirements.items():
             if req.get("status") == "CLARIFIED":
-                self.sm.requirements[uid]["status"] = "VALIDATED"
                 self.sm.requirements[uid]["status"] = "HUMAN_REVIEW"
 
     # ── JSON parser ───────────────────────────────────────────

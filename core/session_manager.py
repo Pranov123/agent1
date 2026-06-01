@@ -8,22 +8,24 @@ class SessionManager:
     """
     Manages the lifecycle of a single Agent 1 pipeline run.
     Tracks all requirements, their states, versions, flags,
-    and produces the final session record.
+    assumptions, decisions, and produces the final session record.
     """
 
     def __init__(self):
-        self.session_id  = self._generate_session_id()
-        self.created_at  = datetime.now().isoformat()
-        self.raw_input   = ""
-        self.requirements = {}   # uid -> requirement dict
-        self.non_goals    = {}   # uid -> non-goal dict
-        self.flags        = {}   # uid -> list of flags
-        self.hitl1_log    = []   # list of rounds
-        self.hitl2_log    = []   # list of reviewer actions
-        self.ethos_output = {}   # risk tier, confidence, etc
-        self.stage_outputs = {}  # stage name -> raw output
-        self.version_counters = {}  # uid -> current version int
-        self.status = "ACTIVE"
+        self.session_id       = self._generate_session_id()
+        self.created_at       = datetime.now().isoformat()
+        self.raw_input        = ""
+        self.requirements     = {}   # uid -> requirement dict
+        self.non_goals        = {}   # uid -> non-goal dict
+        self.flags            = {}   # uid -> list of flags
+        self.hitl1_log        = []   # list of rounds
+        self.hitl2_log        = []   # list of reviewer actions
+        self.ethos_output     = {}   # risk tier, confidence, etc
+        self.stage_outputs    = {}   # stage name -> raw output
+        self.version_counters = {}   # uid -> current version int
+        self.assumptions      = []   # stated assumptions register
+        self.decisions        = []   # key decisions made during pipeline
+        self.status           = "ACTIVE"
 
     # ── Session ID ────────────────────────────────────────────
     def _generate_session_id(self) -> str:
@@ -45,39 +47,38 @@ class SessionManager:
 
     # ── Add requirement ───────────────────────────────────────
     def add_requirement(self, req: dict) -> str:
-        """Add a new requirement. Assigns UID if not present."""
         if "uid" not in req or not req["uid"]:
             req["uid"] = self.generate_req_uid()
 
         uid = req["uid"]
 
-        # initialise version tracking
         if uid not in self.version_counters:
             self.version_counters[uid] = 1
 
-        req["version"]         = f"V{self.version_counters[uid]}"
-        req["created_at"]      = datetime.now().isoformat()
-        req["updated_at"]      = datetime.now().isoformat()
-        req["version_history"] = []
-        req["session_id"]      = self.session_id
+        req["version"]              = f"V{self.version_counters[uid]}"
+        req["created_at"]           = datetime.now().isoformat()
+        req["updated_at"]           = datetime.now().isoformat()
+        req["version_history"]      = []
+        req["session_id"]           = self.session_id
+        req["dependencies"]         = req.get("dependencies", [])
+        req["related_ambiguities"]  = req.get("related_ambiguities", [])
+        req["source_context"]       = req.get("source_context", req.get("source_quote", ""))
+        req["acceptance_criteria"]  = req.get("acceptance_criteria", [])
+        req["assumptions"]          = req.get("assumptions", [])
 
         self.requirements[uid] = req
         self.flags[uid]        = []
         return uid
 
     # ── Update requirement state ──────────────────────────────
-    def transition_state(self, uid: str, new_state: str, actor: str = "system") -> bool:
-        """
-        Transition a requirement to a new state.
-        Logs the transition. Returns False if uid not found.
-        """
+    def transition_state(self, uid: str, new_state: str,
+                         actor: str = "system") -> bool:
         if uid not in self.requirements:
             return False
 
         req       = self.requirements[uid]
         old_state = req.get("status", "UNKNOWN")
 
-        # archive current version before changing
         req["version_history"].append({
             "version"    : req.get("version"),
             "status"     : old_state,
@@ -86,22 +87,59 @@ class SessionManager:
             "changed_by" : actor
         })
 
+        # increment version on every state change
+        self.version_counters[uid] += 1
+        req["version"]    = f"V{self.version_counters[uid]}"
         req["status"]     = new_state
         req["updated_at"] = datetime.now().isoformat()
         return True
 
+    # ── Enrich requirement after HITL 1 ──────────────────────
+    def enrich_requirement(self, uid: str, enrichment: dict):
+        """
+        Apply enrichment from Stage 1C.
+        Updates description, confidence, dependencies,
+        related_ambiguities, source_context, acceptance_criteria.
+        """
+        if uid not in self.requirements:
+            return
+
+        req = self.requirements[uid]
+
+        # update fields if enrichment provides them
+        if enrichment.get("enriched_description"):
+            req["description"] = enrichment["enriched_description"]
+
+        if enrichment.get("confidence"):
+            req["confidence"] = enrichment["confidence"]
+
+        if enrichment.get("dependencies"):
+            req["dependencies"] = enrichment["dependencies"]
+
+        if enrichment.get("related_ambiguities"):
+            req["related_ambiguities"] = enrichment["related_ambiguities"]
+
+        if enrichment.get("source_context"):
+            req["source_context"] = enrichment["source_context"]
+
+        if enrichment.get("acceptance_criteria"):
+            req["acceptance_criteria"] = enrichment["acceptance_criteria"]
+
+        if enrichment.get("assumptions"):
+            req["assumptions"] = enrichment["assumptions"]
+
+        req["updated_at"] = datetime.now().isoformat()
+        req["enriched"]   = True
+
     # ── Bulk state transition ─────────────────────────────────
-    def transition_all(self, uids: list, new_state: str, actor: str = "system"):
+    def transition_all(self, uids: list, new_state: str,
+                       actor: str = "system"):
         for uid in uids:
             self.transition_state(uid, new_state, actor)
 
     # ── Add flag ──────────────────────────────────────────────
     def add_flag(self, uid: str, flag_type: str, description: str,
                  blocking: bool = False, source: str = "system"):
-        """
-        Attach a flag to a requirement.
-        blocking=True means it hard-blocks the APPROVED transition.
-        """
         if uid not in self.flags:
             self.flags[uid] = []
 
@@ -127,17 +165,42 @@ class SessionManager:
     def add_non_goal(self, ng: dict) -> str:
         if "uid" not in ng or not ng["uid"]:
             ng["uid"] = self.generate_ng_uid()
-        uid          = ng["uid"]
-        ng["status"] = "ACTIVE"
+        uid              = ng["uid"]
+        ng["status"]     = "ACTIVE"
         ng["created_at"] = datetime.now().isoformat()
         self.non_goals[uid] = ng
         return uid
 
+    # ── Add assumption ────────────────────────────────────────
+    def add_assumption(self, ambiguity_ref: str, assumption: str,
+                       reason: str, affected_uids: list = None):
+        """Register a stated assumption in the assumptions register."""
+        self.assumptions.append({
+            "ambiguity_ref"  : ambiguity_ref,
+            "assumption"     : assumption,
+            "reason"         : reason,
+            "affected_uids"  : affected_uids or [],
+            "status"         : "ACTIVE",
+            "created_at"     : datetime.now().isoformat()
+        })
+
+    # ── Add decision ──────────────────────────────────────────
+    def add_decision(self, decision: str, rationale: str,
+                     source: str = "HITL1", affected_uids: list = None):
+        """Log a key decision made during the pipeline."""
+        self.decisions.append({
+            "decision"      : decision,
+            "rationale"     : rationale,
+            "source"        : source,
+            "affected_uids" : affected_uids or [],
+            "made_at"       : datetime.now().isoformat()
+        })
+
     # ── Store stage output ────────────────────────────────────
     def store_stage_output(self, stage: str, output: dict):
         self.stage_outputs[stage] = {
-            "output"     : output,
-            "stored_at"  : datetime.now().isoformat()
+            "output"    : output,
+            "stored_at" : datetime.now().isoformat()
         }
 
     # ── Store ETHOS output ────────────────────────────────────
@@ -188,16 +251,18 @@ class SessionManager:
             states[s] = states.get(s, 0) + 1
 
         return {
-            "session_id"       : self.session_id,
-            "status"           : self.status,
-            "created_at"       : self.created_at,
+            "session_id"        : self.session_id,
+            "status"            : self.status,
+            "created_at"        : self.created_at,
             "total_requirements": len(self.requirements),
-            "total_non_goals"  : len(self.non_goals),
-            "states"           : states,
-            "hitl1_rounds"     : len(self.hitl1_log),
-            "hitl2_actions"    : len(self.hitl2_log),
-            "ethos_risk_tier"  : self.ethos_output.get("risk_tier", "unknown"),
-            "flags_open"       : sum(
+            "total_non_goals"   : len(self.non_goals),
+            "total_assumptions" : len(self.assumptions),
+            "total_decisions"   : len(self.decisions),
+            "states"            : states,
+            "hitl1_rounds"      : len(self.hitl1_log),
+            "hitl2_actions"     : len(self.hitl2_log),
+            "ethos_risk_tier"   : self.ethos_output.get("risk_tier", "unknown"),
+            "flags_open"        : sum(
                 1 for flags in self.flags.values()
                 for f in flags if f["status"] == "OPEN"
             )
@@ -216,6 +281,8 @@ class SessionManager:
             "requirements"  : self.requirements,
             "non_goals"     : self.non_goals,
             "flags"         : self.flags,
+            "assumptions"   : self.assumptions,
+            "decisions"     : self.decisions,
             "ethos_output"  : self.ethos_output,
             "hitl1_log"     : self.hitl1_log,
             "hitl2_log"     : self.hitl2_log,
@@ -242,6 +309,8 @@ class SessionManager:
         sm.requirements    = data["requirements"]
         sm.non_goals       = data["non_goals"]
         sm.flags           = data["flags"]
+        sm.assumptions     = data.get("assumptions", [])
+        sm.decisions       = data.get("decisions", [])
         sm.ethos_output    = data["ethos_output"]
         sm.hitl1_log       = data["hitl1_log"]
         sm.hitl2_log       = data["hitl2_log"]
