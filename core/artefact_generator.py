@@ -317,16 +317,78 @@ class ArtefactGenerator:
                     self._add(f"- ✓ {c}")
                 self._add()
 
+            # full traceability chain
+            self._add("**Traceability Chain:**")
+            self._add()
+            self._add("| Stage | Reference | Detail |")
+            self._add("| --- | --- | --- |")
+
+            # source — original user input quote
+            source = req.get("source_context") or req.get("source_quote", "")
+            if source:
+                self._add(f"| 📝 User Input | Source quote | {source} |")
+
+            # ambiguities linked to this requirement
+            ambs = req.get("related_ambiguities", [])
+            if ambs:
+                # look up the actual ambiguity questions from stage1b
+                stage1b = self.session.get("stage_outputs", {}).get("stage1b", {}).get("output", {})
+                all_ambs = (
+                    stage1b.get("missing_requirements", []) +
+                    stage1b.get("conflicts", []) +
+                    stage1b.get("vague_statements", [])
+                )
+                amb_map = {a.get("id"): a for a in all_ambs}
+                for amb_id in ambs:
+                    amb = amb_map.get(amb_id, {})
+                    q   = amb.get("clarification_question", "")
+                    self._add(f"| ❓ Ambiguity | `{amb_id}` | {q} |")
+
+            # HITL 1 resolutions linked via ambiguity refs
+            hitl1_log = self.session.get("hitl1_log", [])
+            all_resolutions = []
+            for round_data in hitl1_log:
+                all_resolutions.extend(round_data.get("resolutions", []))
+            res_map = {r.get("ambiguity_ref"): r for r in all_resolutions}
+            for amb_id in ambs:
+                res = res_map.get(amb_id)
+                if res:
+                    self._add(
+                        f"| 💬 HITL 1 Answer | `{amb_id}` resolved | "
+                        f"{res.get('human_answer', '')[:120]} |"
+                    )
+
+            # decisions that affected this requirement
+            decisions = self.session.get("decisions", [])
+            uid = req.get("uid", "")
+            for d in decisions:
+                if uid in d.get("affected_uids", []):
+                    self._add(f"| 📌 Decision | {d.get('decision','')} | {d.get('rationale','')} |")
+
+            # validation findings
+            flags = self.session.get("flags", {})
+            req_flags = [f for f in flags.get(uid, []) if f.get("status") == "OPEN"]
+            for fl in req_flags:
+                self._add(
+                    f"| {'🚫' if fl.get('blocking') else '⚠️'} Validation Flag | "
+                    f"{fl.get('type','')} | {fl.get('description','')[:120]} |"
+                )
+
+            # approval
+            hitl2_log = self.session.get("hitl2_log", [])
+            for action in hitl2_log:
+                if action.get("action") in ["APPROVED", "LOCKED"]:
+                    self._add(
+                        f"| ✅ Approval | {action.get('reviewer_id','')} | "
+                        f"{action.get('action','')} on {action.get('timestamp','')[:16]} |"
+                    )
+
+            self._add()
+
             # dependencies
             deps = req.get("dependencies", [])
             if deps:
                 self._add(f"**Dependencies:** {', '.join([f'`{d}`' for d in deps])}")
-                self._add()
-
-            # related ambiguities
-            ambs = req.get("related_ambiguities", [])
-            if ambs:
-                self._add(f"**Related Ambiguities:** {', '.join(ambs)}")
                 self._add()
 
             # flags

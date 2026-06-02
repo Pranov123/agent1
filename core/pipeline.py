@@ -433,6 +433,10 @@ YOUR SOLE JOB:
 Extract atomic, traceable requirements from raw user input.
 
 STRICT RULES:
+0. ALWAYS assign a uid in format REQ-YYYYMMDD-NNN where YYYYMMDD is today's date
+   and NNN is a zero-padded sequence number starting at 001.
+   Example: REQ-20260602-001, REQ-20260602-002, REQ-20260602-003
+   NEVER use short IDs like R1, R2, R3.
 1. NEVER invent requirements not stated or strongly implied
 2. NEVER include implementation details or technology choices
 3. NEVER combine two requirements into one — keep atomic
@@ -446,7 +450,7 @@ OUTPUT FORMAT — valid JSON only, no preamble:
   "session_id": "string",
   "requirements": [
     {
-      "uid": "",
+      "uid": "REQ-YYYYMMDD-NNN",
       "title": "short title",
       "description": "clear testable description",
       "category": "Functional/Non-functional/Constraint",
@@ -894,7 +898,18 @@ OUTPUT FORMAT — valid JSON only, no preamble:
                     f"NON-GOALS: Only from explicit HITL 1 statements. "
                     f"Never infer from silence. Never create a non-goal unless "
                     f"you can quote the exact HITL 1 answer that justifies it.\n\n"
-                    f"Make sure ALL requirements appear in exactly one bucket."
+                    f"Make sure ALL requirements appear in exactly one bucket.\n\n"
+                    f"CRITICAL SCOPE PLACEMENT RULE:\n"
+                    f"If the user EXPLICITLY requested a feature in their original input — "
+                    f"even with hedging words like 'should' or 'and' — it belongs in MVP or Nice-to-Have, "
+                    f"NEVER automatically demoted to Future just because it involves connectivity or complexity.\n"
+                    f"ONLY place a feature in Future if:\n"
+                    f"  1. HITL 1 explicitly said it is behind a paywall, OR\n"
+                    f"  2. HITL 1 explicitly said it is deferred to a later phase\n"
+                    f"If neither condition is met, the feature stays in MVP or Nice-to-Have "
+                    f"based on how the user described it.\n"
+                    f"Phone sync explicitly requested by user = Nice-to-Have minimum, not Future.\n"
+                    f"Never override explicit user intent with your own scope judgment."
                 )}
             ],
             temperature=0.1
@@ -924,7 +939,38 @@ You are adversarial. Your job is to find problems.
 
 CHECK SEVEN THINGS:
 1. CONTRADICTIONS — requirements that cannot both be true
-2. MISSING REQUIREMENTS — logically necessary but absent
+2. MISSING REQUIREMENTS 
+Find things that are logically necessary but absent from all four buckets.
+Ask: "What would a builder have to invent on their own because it wasn't specified?"
+
+Be DOMAIN-AWARE. Generic gaps that apply to every product are not useful.
+Focus on gaps specific to THIS type of product.
+
+For HARDWARE/IoT products, check for:
+- Power management (battery life, charging, low battery behaviour)
+- Sensor accuracy and calibration requirements
+- Data storage limits and overflow handling
+- Connectivity failure handling and retry logic
+- Clock drift and time synchronisation
+- Firmware update mechanism
+- Physical durability and environment tolerance
+
+For MOBILE APPS, check for:
+- Authentication and session management
+- Data migration and backup
+- Push notification permissions
+- App store compliance requirements
+- Offline data conflict resolution
+
+For WEB/SAAS products, check for:
+- Rate limiting and abuse prevention
+- Data export and portability
+- Multi-tenancy isolation
+- SLA and uptime requirements
+
+Only flag gaps that are SPECIFIC and ACTIONABLE for this product.
+Do not flag generic concerns like "no error handling" unless you can identify
+a specific error scenario this product will encounter.
 3. SCOPE EXPLOSION — score 5 factors 0-10, weighted SSS out of 100
    Weights: Req Impact 25%, Arch Expansion 25%, Cross-Cutting 20%, Timeline 15%, Dependency 15%
    Hard veto if Arch Expansion >= 8 OR Cross-Cutting >= 8
