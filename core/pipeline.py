@@ -45,7 +45,7 @@ class Displayer:
                 r.get("category",""),
                 f"[{p_color}]{r.get('priority','')}[/{p_color}]",
                 f"[{c_color}]{r.get('confidence','')}[/{c_color}]",
-                r.get("description","")[:70]
+                r.get("description","")
             )
         self.console.print(t)
         if result.get("extraction_notes"):
@@ -68,8 +68,8 @@ class Displayer:
                 t.add_row(
                     m.get("id",""),
                     f"[{p_color}]{m.get('priority','')}[/{p_color}]",
-                    m.get("description","")[:70],
-                    m.get("clarification_question","")[:80]
+                    m.get("description",""),
+                    m.get("clarification_question","")
                 )
             self.console.print(t)
 
@@ -85,8 +85,8 @@ class Displayer:
                 t.add_row(
                     c.get("id",""),
                     f"[{p_color}]{c.get('priority','')}[/{p_color}]",
-                    c.get("description","")[:70],
-                    c.get("clarification_question","")[:80]
+                    c.get("description",""),
+                    c.get("clarification_question","")
                 )
             self.console.print(t)
 
@@ -102,8 +102,8 @@ class Displayer:
                 t.add_row(
                     v.get("id",""),
                     f"[{p_color}]{v.get('priority','')}[/{p_color}]",
-                    v.get("description","")[:70],
-                    v.get("clarification_question","")[:80]
+                    v.get("description",""),
+                    v.get("clarification_question","")
                 )
             self.console.print(t)
 
@@ -128,8 +128,8 @@ class Displayer:
                 t.add_row(
                     r.get("ambiguity_ref",""),
                     f"[{s_color}]{s}[/{s_color}]",
-                    r.get("human_answer","")[:70],
-                    r.get("resolution_note","")[:60]
+                    r.get("human_answer",""),
+                    r.get("resolution_note","")
                 )
             self.console.print(t)
 
@@ -142,8 +142,8 @@ class Displayer:
             for a in assumptions:
                 t.add_row(
                     a.get("ambiguity_ref",""),
-                    a.get("assumption","")[:90],
-                    a.get("reason","")[:55]
+                    a.get("assumption",""),
+                    a.get("reason","")
                 )
             self.console.print(t)
 
@@ -159,7 +159,7 @@ class Displayer:
                 f"\n  [bold cyan]{r.get('uid','')}[/bold cyan]"
             )
             self.console.print(
-                f"  [bold]Description:[/bold] {r.get('enriched_description','')[:120]}"
+                f"  [bold]Description:[/bold] {r.get('enriched_description','')}"
             )
             self.console.print(
                 f"  [bold]Confidence:[/bold]  [{c_color}]{r.get('confidence','')}[/{c_color}]"
@@ -185,8 +185,8 @@ class Displayer:
             t.add_column("Affected UIDs", width=20)
             for d in decisions:
                 t.add_row(
-                    d.get("decision","")[:70],
-                    d.get("rationale","")[:70],
+                    d.get("decision",""),
+                    d.get("rationale",""),
                     ", ".join(d.get("affected_uids",[]))
                 )
             self.console.print(t)
@@ -214,8 +214,8 @@ class Displayer:
                     item.get("uid",""),
                     item.get("title",""),
                     f"[{p_color}]{item.get('priority','')}[/{p_color}]",
-                    item.get("description","")[:75],
-                    item.get("placement_reason","")[:50]
+                    item.get("description",""),
+                    item.get("placement_reason","")
                 )
             self.console.print(t)
 
@@ -231,8 +231,8 @@ class Displayer:
                 t.add_row(
                     ng.get("uid",""),
                     ng.get("title",""),
-                    ng.get("description","")[:65],
-                    ng.get("reason","")[:60]
+                    ng.get("description",""),
+                    ng.get("reason","")
                 )
             self.console.print(t)
 
@@ -242,7 +242,7 @@ class Displayer:
             for r in new_reqs:
                 self.console.print(
                     f"  [cyan]{r.get('uid','')}[/cyan] — "
-                    f"{r.get('title','')}: {r.get('description','')[:80]}"
+                    f"{r.get('title','')}: {r.get('description','')}"
                 )
 
         if result.get("scope_summary"):
@@ -267,9 +267,9 @@ class Displayer:
                 t.add_row(
                     c.get("id",""),
                     f"[{s_color}]{c.get('severity','')}[/{s_color}]",
-                    c.get("description","")[:75],
+                    c.get("description",""),
                     ", ".join(c.get("req_uids",[])),
-                    c.get("recommendation","")[:50]
+                    c.get("recommendation","")
                 )
             self.console.print(t)
 
@@ -286,8 +286,8 @@ class Displayer:
                 t.add_row(
                     m.get("id",""),
                     f"[{s_color}]{m.get('severity','')}[/{s_color}]",
-                    m.get("description","")[:85],
-                    m.get("recommendation","")[:55]
+                    m.get("description",""),
+                    m.get("recommendation","")
                 )
             self.console.print(t)
 
@@ -336,7 +336,7 @@ class Displayer:
             t.add_column("Description",    width=40)
             t.add_column("Recommendation", width=28)
             for b in bias:
-                t.add_row(b.get("id",""), b.get("type",""), b.get("description","")[:72], b.get("recommendation","")[:50])
+                t.add_row(b.get("id",""), b.get("type",""), b.get("description",""), b.get("recommendation",""))
             self.console.print(t)
 
         ethics = result.get("product_ethics", [])
@@ -348,7 +348,7 @@ class Displayer:
             t.add_column("Description",    width=40)
             t.add_column("Recommendation", width=28)
             for e in ethics:
-                t.add_row(e.get("id",""), e.get("type",""), e.get("description","")[:72], e.get("recommendation","")[:50])
+                t.add_row(e.get("id",""), e.get("type",""), e.get("description",""), e.get("recommendation",""))
             self.console.print(t)
 
         ngc = result.get("non_goal_conflicts", [])
@@ -361,7 +361,7 @@ class Displayer:
             t.add_column("Description",    width=36)
             t.add_column("Recommendation", width=24)
             for n in ngc:
-                t.add_row(n.get("id",""), n.get("requirement_uid",""), n.get("non_goal_uid",""), n.get("description","")[:60], n.get("recommendation","")[:40])
+                t.add_row(n.get("id",""), n.get("requirement_uid",""), n.get("non_goal_uid",""), n.get("description",""), n.get("recommendation",""))
             self.console.print(t)
 
         divergence = result.get("intent_divergence", {})
@@ -718,11 +718,25 @@ FOR EACH REQUIREMENT YOU MUST:
 4. Link related ambiguities — which M/C/V items from Stage 1B relate to this requirement?
 5. Add source context — the broader sentence from the original input, not just a fragment
 6. Add acceptance criteria — 2-4 testable conditions that define when this requirement is done
+   ACCEPTANCE CRITERIA RULES:
+   - Every criterion must be objectively verifiable — a tester must be able to
+     pass or fail it without subjective judgment
+   - Include measurable thresholds where relevant:
+     BAD:  "System accurately tracks water intake"
+     GOOD: "System tracks water intake within +/- 10ml of actual volume consumed"
+     BAD:  "Reminders arrive on time"
+     GOOD: "Reminders fire within 30 seconds of the scheduled time"
+     BAD:  "App works offline"
+     GOOD: "All core features remain functional for minimum 7 days without connectivity"
+   - Use "User can X" or "System does X within Y" or "X must be within Z tolerance"
+   - Never use words like "accurately", "properly", "correctly" without a measurable threshold
 
 STRICT RULES:
 1. Never invent information not present in original input or HITL 1 clarifications
 2. Dependencies must reference actual UIDs from the requirement list
-3. Acceptance criteria must be testable — "User can X" or "System does X when Y" format
+3. Acceptance criteria must be objectively verifiable with measurable thresholds.
+   Never use vague words like "accurately", "properly", "correctly" without a number.
+   Always include tolerances, time limits, or success conditions.
 4. If a requirement was not clarified, keep original description but still fill dependencies and criteria
 5. Confidence upgrades to HIGH only if HITL 1 directly answered a question about this requirement
 6. Extract key decisions as named decisions with rationale
@@ -927,9 +941,18 @@ They are settled decisions. Treat them as ground truth.
 
 RULES:
 - You VALIDATE, never APPROVE
-- Be adversarial — a clean report with no findings needs strong justification
+- Every finding MUST be grounded in evidence from the scope — never speculate
+- BEFORE flagging anything ask: "Is there direct evidence for this in the requirements?"
+- If no evidence exists in the scope, do NOT flag it
+- Do NOT flag pricing concerns if no pricing model is defined in the scope
+- Do NOT flag accessibility concerns if the scope already includes multiple
+  notification methods or interaction modes
+- Do NOT flag generic risks that apply to every product — only flag risks
+  specific to this scope
+- A finding without a direct quote or reference from the requirements is invalid
 - Every finding must reference specific UIDs
 - weighted_sss = single number only
+- A shorter list of high-confidence findings is better than a long list of speculation
 
 OUTPUT FORMAT — valid JSON only, no preamble:
 {
@@ -1005,7 +1028,15 @@ OUTPUT FORMAT — valid JSON only, no preamble:
 
         reviewer_id = input("  Your reviewer ID: ").strip() or "reviewer_001"
         action      = input("  Action (approve/reject/modify): ").strip().lower()
-        notes       = input("  Notes (optional): ").strip()
+        # require meaningful justification
+        while True:
+            notes = input("  Notes (required — min 20 characters): ").strip()
+            if len(notes) >= 20:
+                break
+            console.print(
+                "[red]⚠ Notes must be at least 20 characters. "
+                "Provide meaningful justification for your decision.[/red]"
+            )
 
         if action == "approve":
             approved_count = 0
@@ -1058,8 +1089,8 @@ OUTPUT FORMAT — valid JSON only, no preamble:
                     r.get("uid",""),
                     r.get("title",""),
                     f"[{p_color}]{r.get('priority','')}[/{p_color}]",
-                    r.get("description","")[:80],
-                    r.get("placement_reason","")[:50]
+                    r.get("description",""),
+                    r.get("placement_reason","")
                 )
             console.print(t)
 
@@ -1073,7 +1104,7 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             t.add_column("Description", width=44)
             t.add_column("Reason",      width=28)
             for r in nth:
-                t.add_row(r.get("uid",""), r.get("title",""), r.get("priority",""), r.get("description","")[:80], r.get("placement_reason","")[:50])
+                t.add_row(r.get("uid",""), r.get("title",""), r.get("priority",""), r.get("description",""), r.get("placement_reason",""))
             console.print(t)
 
         future = self.sm.get_by_bucket("FUTURE")
@@ -1086,7 +1117,7 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             t.add_column("Description", width=44)
             t.add_column("Reason",      width=28)
             for r in future:
-                t.add_row(r.get("uid",""), r.get("title",""), r.get("priority",""), r.get("description","")[:80], r.get("placement_reason","")[:50])
+                t.add_row(r.get("uid",""), r.get("title",""), r.get("priority",""), r.get("description",""), r.get("placement_reason",""))
             console.print(t)
 
         if self.sm.non_goals:
@@ -1097,7 +1128,7 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             t.add_column("Description", width=38)
             t.add_column("Reason",      width=34)
             for ng in self.sm.non_goals.values():
-                t.add_row(ng.get("uid",""), ng.get("title",""), ng.get("description","")[:60], ng.get("reason","")[:55])
+                t.add_row(ng.get("uid",""), ng.get("title",""), ng.get("description",""), ng.get("reason",""))
             console.print(t)
 
         cons = stage3.get("contradictions", [])
@@ -1120,17 +1151,17 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         if cons:
             console.print("\n[bold red]Contradictions:[/bold red]")
             for c in cons:
-                console.print(f"  • {c.get('id','')} [{c.get('severity','')}] {c.get('description','')[:100]}")
+                console.print(f"  • {c.get('id','')} [{c.get('severity','')}] {c.get('description','')}")
 
         if miss:
             console.print("\n[bold orange3]Missing requirements:[/bold orange3]")
             for m in miss:
-                console.print(f"  • {m.get('id','')} — {m.get('description','')[:100]}")
+                console.print(f"  • {m.get('id','')} — {m.get('description','')}")
 
         if self.sm.decisions:
             console.print(f"\n[bold purple]── KEY DECISIONS ({len(self.sm.decisions)}) ──[/bold purple]")
             for d in self.sm.decisions:
-                console.print(f"  • {d.get('decision','')} — {d.get('rationale','')[:80]}")
+                console.print(f"  • {d.get('decision','')} — {d.get('rationale','')}")
 
         if self.sm.non_goals:
             console.print(f"\n[bold red]Standing non-goals (cannot be violated):[/bold red]")

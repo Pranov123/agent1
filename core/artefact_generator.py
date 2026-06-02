@@ -118,7 +118,7 @@ class ArtefactGenerator:
     def _build_header(self):
         session    = self.session
         session_id = session.get("session_id", "")
-        created    = session.get("created_at", "")[:10]
+        created    = session.get("created_at", "")
         reqs       = session.get("requirements", {})
         non_goals  = session.get("non_goals", {})
         decisions  = session.get("decisions", [])
@@ -164,6 +164,7 @@ class ArtefactGenerator:
             for fl in fl_list
             if fl.get("status") == "OPEN" and fl.get("blocking")
         )
+        advisory = open_flags - blocking
 
         self._add("| Metric | Value |")
         self._add("| --- | --- |")
@@ -171,8 +172,8 @@ class ArtefactGenerator:
         self._add(f"| 💛 Nice-to-have | {len(nth)} |")
         self._add(f"| 🔵 Future features | {len(future)} |")
         self._add(f"| 🚫 Explicit non-goals | {len(session.get('non_goals', {}))} |")
-        self._add(f"| ⚠️ Open flags | {open_flags} |")
-        self._add(f"| 🚫 Blocking flags | {blocking} |")
+        self._add(f"| 🚫 Blocking flags (hard block) | {blocking} |")
+        self._add(f"| ⚠️ Advisory flags (soft, non-blocking) | {advisory} |")
         self._add(f"| HITL 1 rounds | {len(session.get('hitl1_log', []))} |")
         self._add(f"| Key decisions | {len(session.get('decisions', []))} |")
         self._add()
@@ -236,8 +237,8 @@ class ArtefactGenerator:
                     f"| `{r.get('uid','')}` "
                     f"| **{r.get('title','')}** "
                     f"| {self._priority_badge(r.get('priority',''))} "
-                    f"| {r.get('description','')[:100]} "
-                    f"| {r.get('placement_reason','')[:80]} |"
+                    f"| {r.get('description','')} "
+                    f"| {r.get('placement_reason','')} |"
                 )
             self._add()
 
@@ -262,8 +263,8 @@ class ArtefactGenerator:
             self._add(
                 f"| `{ng.get('uid','')}` "
                 f"| **{ng.get('title','')}** "
-                f"| {ng.get('description','')[:100]} "
-                f"| {ng.get('reason','')[:100]} |"
+                f"| {ng.get('description','')} "
+                f"| {ng.get('reason','')} |"
             )
         self._add()
         self._divider()
@@ -409,8 +410,8 @@ class ArtefactGenerator:
                 self._add(
                     f"| {c.get('id','')} "
                     f"| {c.get('severity','')} "
-                    f"| {c.get('description','')[:120]} "
-                    f"| {c.get('recommendation','')[:100]} |"
+                    f"| {c.get('description','')} "
+                    f"| {c.get('recommendation','')} |"
                 )
             self._add()
 
@@ -424,8 +425,8 @@ class ArtefactGenerator:
                 self._add(
                     f"| {m.get('id','')} "
                     f"| {m.get('severity','')} "
-                    f"| {m.get('description','')[:120]} "
-                    f"| {m.get('recommendation','')[:100]} |"
+                    f"| {m.get('description','')} "
+                    f"| {m.get('recommendation','')} |"
                 )
             self._add()
 
@@ -439,8 +440,8 @@ class ArtefactGenerator:
                 self._add(
                     f"| {b.get('id','')} "
                     f"| {b.get('type','')} "
-                    f"| {b.get('description','')[:120]} "
-                    f"| {b.get('recommendation','')[:100]} |"
+                    f"| {b.get('description','')} "
+                    f"| {b.get('recommendation','')} |"
                 )
             self._add()
 
@@ -454,8 +455,8 @@ class ArtefactGenerator:
                 self._add(
                     f"| {e.get('id','')} "
                     f"| {e.get('type','')} "
-                    f"| {e.get('description','')[:120]} "
-                    f"| {e.get('recommendation','')[:100]} |"
+                    f"| {e.get('description','')} "
+                    f"| {e.get('recommendation','')} |"
                 )
             self._add()
 
@@ -470,8 +471,8 @@ class ArtefactGenerator:
                     f"| {n.get('id','')} "
                     f"| `{n.get('requirement_uid','')}` "
                     f"| `{n.get('non_goal_uid','')}` "
-                    f"| {n.get('description','')[:100]} "
-                    f"| {n.get('recommendation','')[:80]} |"
+                    f"| {n.get('description','')} "
+                    f"| {n.get('recommendation','')} |"
                 )
             self._add()
 
@@ -533,8 +534,8 @@ class ArtefactGenerator:
                         self._add(
                             f"| {r.get('ambiguity_ref','')} "
                             f"| {s_icon} {s} "
-                            f"| {r.get('human_answer','')[:100]} "
-                            f"| {r.get('resolution_note','')[:80]} |"
+                            f"| {r.get('human_answer','')} "
+                            f"| {r.get('resolution_note','')} |"
                         )
                     self._add()
 
@@ -546,8 +547,8 @@ class ArtefactGenerator:
                 self._add(
                     f"| {action.get('reviewer_id','')} "
                     f"| **{action.get('action','')}** "
-                    f"| {action.get('timestamp','')[:16]} "
-                    f"| {action.get('notes','')[:100]} |"
+                    f"| {action.get('timestamp','')} "
+                    f"| {action.get('notes','')} |"
                 )
             self._add()
 
@@ -561,7 +562,7 @@ class ArtefactGenerator:
         self._add(
             f"*Generated by Agent 1 — Requirement Scoping Agent "
             f"| Session `{self.session.get('session_id','')}` "
-            f"| {self.session.get('created_at','')[:10]}*"
+            f"| {self.session.get('created_at','')}*"
         )
 
 
