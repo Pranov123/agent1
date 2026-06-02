@@ -417,7 +417,7 @@ class Pipeline:
             from core.artefact_generator import ArtefactGenerator
             generator = ArtefactGenerator(path)
             pdf_path  = generator.generate()
-            console.print(f"[bold green]📄 PDF artefact generated: {pdf_path}[/bold green]")
+            console.print(f"[bold green]📄 Markdown artefact generated: {pdf_path}[/bold green]")
         except Exception as e:
             console.print(f"[yellow]⚠ PDF generation failed: {e}[/yellow]")
 
