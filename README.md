@@ -214,9 +214,10 @@ The agent asks you up to 5 questions per round, highest priority first:
 ── Round 1 of 3 ──
 
 ╭─── Q1 (P1) ────────────────────────────────────────────╮
-│ How does the app plan to make money while being free?  │
+│ Will the phone app be developed for iOS, Android,      │
+│ or both?                                               │
 ╰────────────────────────────────────────────────────────╯
-  Your answer: > freemium — basic features free, AI behind paywall
+  Your answer: > iOS first, Android in a later phase
 ```
 
 **Tips for answering:**
@@ -229,42 +230,83 @@ The agent asks you up to 5 questions per round, highest priority first:
 - `P2` — needed for specific features
 - `P3` — can proceed with a stated assumption if unanswered
 
-### Step 5 — Review the scope definition
+**Ambiguity ID format:**
+- `MISS-<topic>` — missing information e.g. `MISS-platform`, `MISS-power-source`
+- `CONF-<topic>` — conflict e.g. `CONF-offline-vs-sync`
+- `VAG-<topic>` — vague statement e.g. `VAG-reminder-frequency`
 
-After your answers, Stage 2 organises everything into four buckets:
+---
+
+### Step 5 — Requirement enrichment (Stage 1C)
+
+After your clarification answers, the agent automatically enriches every requirement with everything learned during HITL 1:
 
 ```
-── MVP SCOPE (5 items) ──
-── NICE TO HAVE (1 items) ──
-── FUTURE FEATURES (2 items) ──
-── EXPLICIT NON-GOALS (3 items) ──
+── ENRICHED REQUIREMENTS (4) ──
+
+  REQ-20260603-001
+  Description: The smart water bottle shall remind the user to drink
+               water at configurable intervals, default every 60 minutes
+               between 8am and 10pm, using LED glow ring and vibration motor.
+  Confidence:  🟢 HIGH
+  Acceptance criteria:
+    ✓ Reminder fires within 1 minute of scheduled time
+    ✓ Reminder uses both visual and haptic alerts
+    ✓ User can adjust frequency via phone app
+
+── DECISIONS EXTRACTED (4) ──
+  Use LED glow ring and vibration motor for reminders
+  Use Bluetooth for syncing with phone
+  ...
+```
+
+This step updates requirement descriptions, upgrades confidence levels, fills in dependencies, adds measurable acceptance criteria, and extracts key decisions. No input needed from you — it runs automatically.
+
+---
+
+### Step 6 — Review the scope definition
+
+After enrichment, Stage 2 organises everything into four buckets:
+
+```
+── MVP SCOPE (6 items) ──
+── NICE TO HAVE (0 items) ──
+── FUTURE FEATURES (0 items) ──
+── EXPLICIT NON-GOALS (2 items) ──
 ```
 
 **What each bucket means:**
 - **MVP** — the minimum set of features needed to ship a working product
 - **Nice to have** — valuable features that are not launch-blocking
 - **Future features** — explicitly deferred to a later phase
-- **Non-goals** — things this product will deliberately never do in this phase, derived from your HITL 1 answers
+- **Non-goals** — things this product will deliberately never do in this phase, derived only from explicit HITL 1 decisions
 
-### Step 6 — Review validation findings
+Non-goals are never invented — they are always traceable to a specific answer you gave during HITL 1.
+
+---
+
+### Step 7 — Review validation findings
 
 Stage 3 adversarially reviews the scope and shows you:
 
 ```
-── CONTRADICTIONS (1) ──
-── MISSING REQUIREMENTS (1) ──
+── MISSING REQUIREMENTS (2) ──
 ── SCOPE EXPLOSION ANALYSIS ──
-   Weighted SSS: 42/100   Severity: Minor
-── BIAS AUDIT (1) ──
-── PRODUCT ETHICS (1) ──
+   Weighted SSS: 38/100   Severity: Minor
+── BIAS AUDIT (0) ──
+── PRODUCT ETHICS (0) ──
 ```
+
+The validator is evidence-based — it only flags issues that are directly supported by what is (or is not) in the scope. It will not invent risks.
 
 **Scope Severity Score (SSS):**
 - `0–35` Minor — healthy scope, safe to proceed
 - `36–65` Medium — review carefully, consider splitting features
 - `66–100` Major — scope is too large, must reduce before proceeding
 
-### Step 7 — Approve or reject (HITL 2)
+---
+
+### Step 8 — Approve or reject (HITL 2)
 
 The full scope is shown with all validation flags. You make the final call:
 
@@ -273,102 +315,35 @@ REVIEWER ACTION
 Options: approve / reject / modify
 
   Your reviewer ID: > reviewer_001
-  Action: > approve
-  Notes: > acknowledged bias flag, auth to be added next iteration
+  Action (approve/reject/modify): > approve
+  Notes (required — min 20 characters): > all NFRs captured, traceability complete, approved for handoff
 ```
 
 - `approve` — all requirements are locked and saved to disk
 - `reject` — all requirements are rejected with your reason recorded
 - `modify` — requirements stay open, you can re-run with adjustments
 
-### Step 8 — Session saved
+> **Note:** Notes are required and must be at least 20 characters. This enforces meaningful reviewer justification.
+
+---
+
+### Step 9 — Session saved
 
 ```
-✅ Session complete — saved to output/SES-20260530-ABC123.json
+✅ Session saved — output/SES-20260603-CEB396.json
+📄 Markdown artefact — output/SES-20260603-CEB396_scope.md
 
 SESSION SUMMARY
-  Session ID   : SES-20260530-ABC123
-  Requirements : 8
-  Non-goals    : 3
-  Open flags   : 3
-  HITL1 rounds : 2
+  Session ID   : SES-20260603-CEB396
+  Requirements : 6
+  Non-goals    : 2
+  Open flags   : 0
+  HITL1 rounds : 3
 ```
 
-Your full session is saved to the `output/` folder as a JSON file.
+Two files are produced simultaneously — the full session JSON and the human-readable markdown scope document.
 
 ---
-
-## Understanding the Output
-
-Every run produces two files in the `output/` folder with the same session ID:
-
-```
-output/
-├── SES-20260603-CEB396.json         ← full session data (machine readable)
-└── SES-20260603-CEB396_scope.md     ← scope document (human readable)
-```
-
-The markdown file is the primary deliverable — it is the document you hand off to your development team.
-
----
-
-### Scope Document (\_scope.md)
-
-The markdown artefact contains eight sections:
-
-| Section | Contents |
-| --- | --- |
-| **1. Summary** | Requirement counts, flag counts, original input |
-| **2. Key Decisions** | Decisions made during clarification with rationale and affected requirements |
-| **3. Scope Definition** | MVP, nice-to-have, and future features in tables |
-| **4. Explicit Non-Goals** | Hard boundaries derived from HITL 1 decisions |
-| **5. Requirements Detail** | Full spec per requirement — description, acceptance criteria, traceability chain, dependencies, flags |
-| **6. Validation Report** | Scope explosion score, contradictions, missing requirements, bias and ethics flags |
-| **7. Assumptions Register** | Any stated assumptions made when clarification rounds were exhausted |
-| **8. Review Log** | Full audit trail — HITL 1 answers and HITL 2 approval |
-
----
-
-### Requirement Lifecycle
-
-Requirements move through these states during the pipeline:
-
-```
-DRAFT → EXTRACTED → CLARIFICATION_PENDING → CLARIFIED → VALIDATED → HUMAN_REVIEW → APPROVED → LOCKED
-```
-
-After HITL 2 approval all requirements are `LOCKED` — they cannot be changed without a formal change request.
-
----
-
-### Flag Types
-
-| Flag | Type | Blocks approval? |
-| --- | --- | --- |
-| `COMPLIANCE_HOLD` | Hard block | Yes — must be resolved |
-| `LEGAL_CONFLICT` | Hard block | Yes — must be resolved |
-| `NON_GOAL_CONFLICT` | Hard block | Yes — must be resolved |
-| `BIAS_AUDIT` | Advisory | No — informational only |
-| `ACCESSIBILITY_OMISSION` | Advisory | No — informational only |
-| `PRODUCT_ETHICS` | Advisory | No — informational only |
-| `CONTRADICTION` | Advisory | No — informational only |
-
-Hard flags block the approval transition until resolved. Advisory flags are surfaced for reviewer awareness but do not block the pipeline.
-
----
-
-### Traceability Chain
-
-Every requirement in the scope document includes a full traceability chain showing exactly how it evolved:
-
-| Stage | What it shows |
-| --- | --- |
-| 📝 User Input | The exact phrase from the original input that led to this requirement |
-| ❓ Ambiguity | Which ambiguities were raised about this requirement |
-| 💬 HITL 1 Answer | The human answers that resolved those ambiguities |
-| 📌 Decision | Key decisions that shaped this requirement |
-| ⚠️ / 🚫 Validation Flag | Any flags raised during Stage 3 validation |
-| ✅ Approval | Who approved it and when |
 
 ## Project Structure
 
@@ -378,17 +353,21 @@ agent1/
 ├── config.py                # All settings — API key, models, thresholds
 ├── core/
 │   ├── __init__.py          # Client factory
-│   ├── pipeline.py          # Main orchestrator — runs all 6 stages (1A, 1B, HITL1, 1C, 2, 3)
-│   ├── session_manager.py   # Tracks requirements, states, flags, versions
-│   └── state_machine.py     # Enforces valid state transitions
-├── prompts/                 # Individual stage scripts for testing
-│   ├── stage1a_extractor.py
-│   ├── stage1b_ambiguity.py
-│   ├── hitl1_checkpoint.py
-│   ├── stage2_scope.py
-│   └── stage3_validation.py
-├── output/                  # Session JSON files saved here
+│   ├── pipeline.py          # Main orchestrator — runs all 6 stages
+│   ├── session_manager.py   # Tracks requirements, states, flags, versions,
+│   │                        # decisions, assumptions, and produces session record
+│   ├── state_machine.py     # Enforces valid state transitions, actor authority,
+│   │                        # hard block flags, and rollback recovery
+│   └── artefact_generator.py# Generates markdown scope document from session JSON
+├── prompts/                 # Individual stage scripts for prompt testing
+│   ├── stage1a_extractor.py # Requirement extraction
+│   ├── stage1b_ambiguity.py # Ambiguity detection
+│   ├── hitl1_checkpoint.py  # Clarification loop
+│   ├── stage2_scope.py      # Scope definition
+│   └── stage3_validation.py # Adversarial validation
+├── output/                  # Session JSON and markdown artefacts saved here
 └── logs/                    # Log files
+```
 ```
 
 ---
