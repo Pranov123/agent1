@@ -48,6 +48,8 @@ TRANSITIONS = {
     ("APPROVED",              "ROLLBACK")             : "human",
     ("LOCKED",                "ROLLBACK")             : "human",
     ("VALIDATED",             "ROLLBACK")             : "human",
+    ("ROLLBACK",  "DRAFT")                : "system",   # auto re-enter pipeline
+    ("ROLLBACK",  "CLARIFIED")            : "system",   # skip re-extraction if clean
 }
 
 # ── Hard block flags ──────────────────────────────────────────
@@ -195,3 +197,44 @@ class StateMachine:
                 report["valid"].append(uid)
 
         return report
+    
+    def execute_rollback(self, uid: str, target_version: str,
+                     actor: str = "human") -> tuple[bool, str]:
+            """
+            Roll back a requirement to a previous version.
+            Restores the snapshot, marks current as DEPRECATED,
+            creates new version, re-enters at CLARIFIED state.
+            """
+            if uid not in self.sm.requirements:
+                return False, f"Requirement {uid} not found"
+
+            req      = self.sm.requirements[uid]
+            history  = req.get("version_history", [])
+
+            # find target version in history
+            target = next(
+                (h for h in history if h.get("version") == target_version),
+                None
+            )
+            if not target:
+                return False, f"Version {target_version} not found in history"
+
+            # mark current as deprecated
+            self.sm.transition_state(uid, "DEPRECATED", actor,
+                                    rationale=f"Rolled back to {target_version}")
+
+            # restore snapshot as new version
+            req["description"] = target.get("snapshot", req["description"])
+
+            # re-enter at CLARIFIED
+            ok, reason = self.transition(uid, "ROLLBACK", actor)
+            if not ok:
+                return False, reason
+
+            # auto-advance to CLARIFIED for re-validation
+            self.sm.transition_state(
+                uid, "CLARIFIED", actor="system",
+                rationale=f"Restored from {target_version} — awaiting re-validation"
+            )
+
+            return True, f"Rolled back to {target_version} — now in CLARIFIED state for re-validation"

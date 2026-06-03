@@ -72,7 +72,8 @@ class SessionManager:
 
     # ── Update requirement state ──────────────────────────────
     def transition_state(self, uid: str, new_state: str,
-                         actor: str = "system") -> bool:
+                         actor: str = "system",
+                         rationale: str = "") -> bool:
         if uid not in self.requirements:
             return False
 
@@ -81,10 +82,12 @@ class SessionManager:
 
         req["version_history"].append({
             "version"    : req.get("version"),
-            "status"     : old_state,
+            "from_state" : old_state,
+            "to_state"   : new_state,
             "snapshot"   : req.get("description"),
             "changed_at" : datetime.now().isoformat(),
-            "changed_by" : actor
+            "changed_by" : actor,
+            "rationale"  : rationale  # populated by caller when known
         })
 
         # increment version on every state change

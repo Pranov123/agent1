@@ -410,16 +410,16 @@ class Pipeline:
         self._run_hitl2(stage3)
 
         path = self.sm.save()
-        console.print(f"\n[bold green]✅ Session complete — saved to {path}[/bold green]")
-        return self.sm.summary()
-        # generate PDF artefact
+        console.print(f"\n[bold green]✅ Session saved — {path}[/bold green]")
+
+        # generate markdown artefact alongside JSON
         try:
             from core.artefact_generator import ArtefactGenerator
             generator = ArtefactGenerator(path)
-            pdf_path  = generator.generate()
-            console.print(f"[bold green]📄 Markdown artefact generated: {pdf_path}[/bold green]")
+            md_path   = generator.generate()
+            console.print(f"[bold green]📄 Markdown artefact — {md_path}[/bold green]")
         except Exception as e:
-            console.print(f"[yellow]⚠ PDF generation failed: {e}[/yellow]")
+            console.print(f"[yellow]⚠ Markdown generation failed: {e}[/yellow]")
 
         return self.sm.summary()
 
@@ -444,6 +444,14 @@ STRICT RULES:
 5. If user used "maybe", "could", "might" — mark confidence: LOW
 6. If clearly stated — mark confidence: HIGH
 7. If implied but not stated — mark confidence: MEDIUM
+8. ALWAYS extract Non-Functional Requirements (NFRs) as separate requirements:
+   - Performance requirements (response time, accuracy thresholds)
+   - Reliability requirements (uptime, failure handling)
+   - Power requirements (battery life, charging)
+   - Storage requirements (capacity, retention period)
+   - Security requirements (encryption, authentication)
+   - If the user implies any of these, extract them as explicit NFRs with category: Non-functional
+   - Example: "works offline" implies a storage NFR and a power NFR
 
 OUTPUT FORMAT — valid JSON only, no preamble:
 {
@@ -505,13 +513,18 @@ STRICT RULES:
 2. NEVER invent conflicts that are not there
 3. Every item must have a specific clarification question
 4. Prioritise: P1=blocks all scoping, P2=blocks feature, P3=can assume
+5. Ambiguity IDs must be descriptive, not sequential numbers:
+   - Missing requirements: MISS-<topic> e.g. MISS-platform, MISS-auth, MISS-storage
+   - Conflicts: CONF-<topic> e.g. CONF-free-vs-paid, CONF-offline-vs-sync
+   - Vague statements: VAG-<topic> e.g. VAG-ai-scope, VAG-offline-scope
+   Never use M1, M2, C1, V1 — use descriptive slugs
 
 OUTPUT FORMAT — valid JSON only, no preamble:
 {
   "session_id": "string",
   "ambiguity_count": 0,
   "missing_requirements": [
-    {"id":"M1","description":"","affected_requirements":[],"clarification_question":"","priority":"P1"}
+    {"id":"MISS-platform","description":"","affected_requirements":[],"clarification_question":"","priority":"P1"}
   ],
   "conflicts": [
     {"id":"C1","description":"","affected_requirements":[],"clarification_question":"","priority":"P1"}
@@ -718,7 +731,15 @@ Enrich each requirement with everything learned during clarification.
 FOR EACH REQUIREMENT YOU MUST:
 1. Update the description to reflect clarifications — not the vague original, the clarified version
 2. Update confidence — if a LOW confidence requirement was clarified, upgrade it to HIGH
-3. Fill in dependencies — which other requirement UIDs does this one depend on?
+3. Fill in dependencies — which other requirement UIDs does this one TECHNICALLY depend on?
+   A dependency means: this requirement CANNOT function without the other one.
+   STRICT RULES for dependencies:
+   - Only add a dependency if removing the other requirement makes this one impossible
+   - Offline features do NOT depend on sync features
+   - Core tracking does NOT depend on phone connectivity
+   - Example VALID: "Sync with phone" depends on "Operate without phone" (sync needs local storage)
+   - Example INVALID: "Remind user" depends on "Sync with phone" (reminders work offline)
+   - When in doubt, leave dependencies empty
 4. Link related ambiguities — which M/C/V items from Stage 1B relate to this requirement?
 5. Add source context — the broader sentence from the original input, not just a fragment
 6. Add acceptance criteria — 2-4 testable conditions that define when this requirement is done
@@ -742,8 +763,21 @@ STRICT RULES:
    Never use vague words like "accurately", "properly", "correctly" without a number.
    Always include tolerances, time limits, or success conditions.
 4. If a requirement was not clarified, keep original description but still fill dependencies and criteria
-5. Confidence upgrades to HIGH only if HITL 1 directly answered a question about this requirement
-6. Extract key decisions as named decisions with rationale
+5. Reassess confidence based on answer quality — not just presence of an answer:
+   HIGH   — HITL 1 gave a specific, detailed, unambiguous answer directly about this requirement
+   MEDIUM — HITL 1 gave a partial answer or the answer resolved some but not all ambiguity
+   LOW    — HITL 1 gave a vague answer, or this requirement was never directly addressed
+   IMPORTANT: An answer that is itself vague does NOT upgrade confidence to HIGH.
+   Example: "it should work somehow" as an answer keeps confidence at LOW.
+   Example: "LED ring fires every 60 minutes between 8am-10pm" upgrades confidence to HIGH.
+6. Extract key decisions as named decisions with rationale.
+   IMPORTANT — separate these two types:
+   TYPE A — USER DECISIONS: Things the user explicitly chose (platform, pricing model, data ownership)
+   TYPE B — DESIGN DECISIONS: Technical choices made during clarification (load-cell sensor, LED ring)
+   Label each decision with its type in the rationale field.
+   User requirements must NEVER be rewritten as design decisions.
+   Example WRONG: turning "syncs with phone" into a design decision
+   Example RIGHT: "syncs with phone" stays as a requirement, "use Bluetooth for sync" is a design decision
 
 OUTPUT FORMAT — valid JSON only, no preamble:
 {
@@ -908,7 +942,8 @@ OUTPUT FORMAT — valid JSON only, no preamble:
                     f"  2. HITL 1 explicitly said it is deferred to a later phase\n"
                     f"If neither condition is met, the feature stays in MVP or Nice-to-Have "
                     f"based on how the user described it.\n"
-                    f"Phone sync explicitly requested by user = Nice-to-Have minimum, not Future.\n"
+                    f"Phone sync explicitly requested by user = MVP, not Nice-to-Have and not Future.\n"
+                    f"If the user said 'syncs with your phone' — that is an explicit request and belongs in MVP.\n"  
                     f"Never override explicit user intent with your own scope judgment."
                 )}
             ],
