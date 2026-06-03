@@ -300,35 +300,36 @@ Your full session is saved to the `output/` folder as a JSON file.
 
 ## Understanding the Output
 
-### Session JSON
+Every run produces two files in the `output/` folder with the same session ID:
 
-Every run produces a file at `output/SES-YYYYMMDD-XXXXXX.json` containing:
-
-```json
-{
-  "session_id": "SES-20260530-ABC123",
-  "raw_input": "your original idea",
-  "requirements": {
-    "REQ-20260530-001": {
-      "uid": "REQ-20260530-001",
-      "title": "Habit Tracking",
-      "description": "System must allow users to track their habits",
-      "category": "Functional",
-      "priority": "Critical",
-      "status": "LOCKED",
-      "scope_bucket": "MVP",
-      "version": "V1",
-      "version_history": []
-    }
-  },
-  "non_goals": {},
-  "flags": {},
-  "hitl1_log": [],
-  "hitl2_log": []
-}
+```
+output/
+├── SES-20260603-CEB396.json         ← full session data (machine readable)
+└── SES-20260603-CEB396_scope.md     ← scope document (human readable)
 ```
 
-### Requirement lifecycle
+The markdown file is the primary deliverable — it is the document you hand off to your development team.
+
+---
+
+### Scope Document (\_scope.md)
+
+The markdown artefact contains eight sections:
+
+| Section | Contents |
+| --- | --- |
+| **1. Summary** | Requirement counts, flag counts, original input |
+| **2. Key Decisions** | Decisions made during clarification with rationale and affected requirements |
+| **3. Scope Definition** | MVP, nice-to-have, and future features in tables |
+| **4. Explicit Non-Goals** | Hard boundaries derived from HITL 1 decisions |
+| **5. Requirements Detail** | Full spec per requirement — description, acceptance criteria, traceability chain, dependencies, flags |
+| **6. Validation Report** | Scope explosion score, contradictions, missing requirements, bias and ethics flags |
+| **7. Assumptions Register** | Any stated assumptions made when clarification rounds were exhausted |
+| **8. Review Log** | Full audit trail — HITL 1 answers and HITL 2 approval |
+
+---
+
+### Requirement Lifecycle
 
 Requirements move through these states during the pipeline:
 
@@ -336,22 +337,38 @@ Requirements move through these states during the pipeline:
 DRAFT → EXTRACTED → CLARIFICATION_PENDING → CLARIFIED → VALIDATED → HUMAN_REVIEW → APPROVED → LOCKED
 ```
 
-After HITL 2 approval, all requirements are `LOCKED`. They cannot be changed without raising a formal change request.
-
-### Flag types
-
-| Flag | Type | Blocks approval? |
-|------|------|-----------------|
-| `COMPLIANCE_HOLD` | Hard | Yes — must be resolved |
-| `LEGAL_CONFLICT` | Hard | Yes — must be resolved |
-| `NON_GOAL_CONFLICT` | Hard | Yes — must be resolved |
-| `BIAS_AUDIT` | Soft | No — must be acknowledged |
-| `PRODUCT_ETHICS` | Soft | No — must be acknowledged |
-| `CONTRADICTION` | Soft | No — must be acknowledged |
-
-Hard flags block the approval transition until resolved by a designated authority. Soft flags must be acknowledged at HITL 2 but do not block approval.
+After HITL 2 approval all requirements are `LOCKED` — they cannot be changed without a formal change request.
 
 ---
+
+### Flag Types
+
+| Flag | Type | Blocks approval? |
+| --- | --- | --- |
+| `COMPLIANCE_HOLD` | Hard block | Yes — must be resolved |
+| `LEGAL_CONFLICT` | Hard block | Yes — must be resolved |
+| `NON_GOAL_CONFLICT` | Hard block | Yes — must be resolved |
+| `BIAS_AUDIT` | Advisory | No — informational only |
+| `ACCESSIBILITY_OMISSION` | Advisory | No — informational only |
+| `PRODUCT_ETHICS` | Advisory | No — informational only |
+| `CONTRADICTION` | Advisory | No — informational only |
+
+Hard flags block the approval transition until resolved. Advisory flags are surfaced for reviewer awareness but do not block the pipeline.
+
+---
+
+### Traceability Chain
+
+Every requirement in the scope document includes a full traceability chain showing exactly how it evolved:
+
+| Stage | What it shows |
+| --- | --- |
+| 📝 User Input | The exact phrase from the original input that led to this requirement |
+| ❓ Ambiguity | Which ambiguities were raised about this requirement |
+| 💬 HITL 1 Answer | The human answers that resolved those ambiguities |
+| 📌 Decision | Key decisions that shaped this requirement |
+| ⚠️ / 🚫 Validation Flag | Any flags raised during Stage 3 validation |
+| ✅ Approval | Who approved it and when |
 
 ## Project Structure
 
