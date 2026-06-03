@@ -368,15 +368,13 @@ agent1/
 ├── output/                  # Session JSON and markdown artefacts saved here
 └── logs/                    # Log files
 ```
-```
-
----
 
 ## Example Inputs
 
 Agent 1 works on any domain. Here are some examples to try:
 
 **SaaS product:**
+
 ```
 I want to build a tool for freelancers to track their invoices, send payment 
 reminders automatically, and see which clients pay late. Should integrate with 
