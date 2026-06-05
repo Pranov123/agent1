@@ -59,17 +59,9 @@ All notable changes to Agent 1 are documented here.
 ### Internal Architecture
 
 * Added `ETHOSEngine` as a dedicated governance orchestration component
-* Added semantic domain classification subsystem
-* Added independent risk-pattern detection subsystem
-* Added severity-weighted aggregation engine
-* Added confidence-band evaluator
-* Added governance decision builder
-* Added risk-category classifier
-* Added auto-escalation framework
-* Added ambiguity review workflow
-* Added governance traceability reporting
-* Added input-quality scoring module
-* Added pattern severity weighting configuration
+* Added semantic domain classification subsystem, independent risk-pattern detection subsystem, severity-weighted aggregation engine.
+* Added confidence-band evaluator, governance decision builder, risk-category classifier, auto-escalation framework
+* Added ambiguity review workflow, governance traceability reporting, input-quality scoring module, pattern severity weighting configuration
 * Added governance metadata export layer
 
 ### Governance Outcomes
