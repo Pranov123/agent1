@@ -184,8 +184,52 @@ class ArtefactGenerator:
             self._add(f"> {raw}")
             self._add()
 
+        self._build_ethos_section()
         self._divider()
+    
+    def _build_ethos_section(self):
+        ethos = self.session.get("ethos_output", {})
+        if not ethos:
+            return
 
+        self._h2("ETHOS Governance Classification")
+
+        risk_tier  = ethos.get("risk_tier", "UNKNOWN")
+        band       = ethos.get("confidence_band", "UNKNOWN")
+        score      = ethos.get("confidence_score", 0)
+        reason     = ethos.get("escalation_reason", "")
+        action     = ethos.get("recommended_action", "")
+        domain     = ethos.get("domain", "")
+        patterns   = ethos.get("patterns_detected", [])
+        rerun      = ethos.get("ethos_rerun_triggered", False)
+
+        tier_icon  = {"LOW": "🟢", "MEDIUM": "🟡", "HIGH": "🔴"}.get(risk_tier, "⬜")
+        band_icon  = {"HIGH": "🟢", "UNCERTAIN": "🟡", "LOW": "🔴"}.get(band, "⬜")
+
+        self._add("| Field | Value |")
+        self._add("| --- | --- |")
+        self._add(f"| **Risk Tier** | {tier_icon} {risk_tier} |")
+        self._add(f"| **Confidence Score** | {score} |")
+        self._add(f"| **Confidence Band** | {band_icon} {band} |")
+        self._add(f"| **Domain** | {domain} |")
+        self._add(f"| **Escalation Reason** | {reason} |")
+        self._add(f"| **ETHOS Re-run** | {'✓ Yes — ran again after HITL 1' if rerun else 'No'} |")
+        self._add()
+        self._add(f"**Recommended Action:** {action}")
+        self._add()
+
+        if patterns:
+            self._add(f"**Risk Patterns Detected ({len(patterns)}):**")
+            self._add()
+            self._add("| Pattern | Confidence | Evidence |")
+            self._add("| --- | --- | --- |")
+            for p in patterns:
+                self._add(
+                    f"| `{p.get('pattern','')}` "
+                    f"| {p.get('confidence',0)} "
+                    f"| {p.get('evidence','')} |"
+                )
+            self._add()
     # ── Decisions ─────────────────────────────────────────────
     def _build_decisions(self):
         decisions = self.session.get("decisions", [])

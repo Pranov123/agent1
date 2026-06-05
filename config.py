@@ -3,7 +3,7 @@ import os
 
 # Your Groq API key
 # Get a free key at https://console.groq.com
-GROQ_API_KEY = "your_groq_api_key"
+GROQ_API_KEY = "your_api_key_here"
 
 # Groq settings
 GROQ_BASE_URL         = "https://api.groq.com/openai/v1"

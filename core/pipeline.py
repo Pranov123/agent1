@@ -378,6 +378,46 @@ class Displayer:
                 title="[bold]Validation Summary[/bold]",
                 border_style="purple"
             ))
+    def ethos(self, result: dict):
+        if not result:
+            return
+
+        risk_tier  = result.get("risk_tier", "UNKNOWN")
+        band       = result.get("confidence_band", "UNKNOWN")
+        score      = result.get("confidence_score", 0)
+        reason     = result.get("escalation_reason", "")
+        action     = result.get("recommended_action", "")
+        domain     = result.get("domain", "")
+        patterns   = result.get("patterns_detected", [])
+        rerun      = result.get("ethos_rerun_triggered", False)
+
+        tier_color = {"LOW": "green", "MEDIUM": "yellow", "HIGH": "red"}.get(risk_tier, "white")
+        band_color = {"HIGH": "green", "UNCERTAIN": "yellow", "LOW": "red"}.get(band, "white")
+
+        self.console.print(f"\n[bold]Risk Tier:[/bold]         [{tier_color}]{risk_tier}[/{tier_color}]")
+        self.console.print(f"[bold]Confidence Score:[/bold]  {score} — [{band_color}]{band} band[/{band_color}]")
+        self.console.print(f"[bold]Domain:[/bold]            {domain}")
+        if rerun:
+            self.console.print(f"[bold]Re-run:[/bold]            ✓ ETHOS re-ran after HITL 1")
+        self.console.print(f"[bold]Escalation reason:[/bold] {reason}")
+        self.console.print(f"[bold]Recommended action:[/bold] {action}")
+
+        if patterns:
+            self.console.print(f"\n[bold yellow]Risk patterns detected ({len(patterns)}):[/bold yellow]")
+            t = Table(show_header=True, header_style="bold yellow")
+            t.add_column("Pattern",    width=28)
+            t.add_column("Confidence", width=12)
+            t.add_column("Evidence",   width=60)
+            for p in patterns:
+                c = p.get("confidence", 0)
+                c_color = "green" if c >= 0.7 else "yellow" if c >= 0.4 else "red"
+                t.add_row(
+                    p.get("pattern", ""),
+                    f"[{c_color}]{c}[/{c_color}]",
+                    p.get("evidence", "")
+                )
+            self.console.print(t)
+        self.console.print()
 
 
 # ══════════════════════════════════════════════════════════════
@@ -391,17 +431,41 @@ class Pipeline:
         self.primary_model    = get_primary_model()
         self.validation_model = get_validation_model()
         self.display          = Displayer(console)
+        from core.ethos import ETHOSEngine
+        self.ethos            = ETHOSEngine()
+    
+    def _display_ethos(self, ethos: dict):
+        self.display.ethos(ethos)
 
     def run(self, user_input: str) -> dict:
         self.sm.raw_input = user_input
         console.print(Rule(f"[bold purple]AGENT 1 — SESSION {self.sm.session_id}[/bold purple]"))
         console.print(f"[dim]Input received — {len(user_input)} characters[/dim]\n")
 
+        # run ETHOS at session start
+        console.print(Rule("[bold purple]ETHOS — Governance Classification[/bold purple]"))
+        console.print("⏳ Running domain inference and risk pattern detection...")
+        ethos_initial = self.ethos.run(user_input)
+        self.sm.store_ethos(ethos_initial)
+        self._display_ethos(ethos_initial)
+
         stage1a      = self._run_stage1a(user_input)
         stage1b      = self._run_stage1b(user_input, stage1a)
         self._load_requirements_from_1a(stage1a)
-        hitl1_result = self._run_hitl1(stage1b)
+        hitl1_result = self._run_hitl1(stage1b, ethos_initial)
         stage1c      = self._run_stage1c(stage1a, stage1b, hitl1_result)
+
+        # ETHOS re-run if LOW confidence band
+        if ethos_initial.get("confidence_band") == "LOW":
+            console.print(Rule("[bold purple]ETHOS — Re-run (post HITL 1)[/bold purple]"))
+            console.print("⏳ Re-running with domain clarification answers...")
+            hitl1_context = "\n".join([
+                f"{r.get('ambiguity_ref')}: {r.get('human_answer','')}"
+                for r in hitl1_result.get("resolutions", [])
+            ])
+            ethos_rerun = self.ethos.run(user_input, hitl1_context)
+            self.sm.store_ethos(ethos_rerun)
+            self._display_ethos(ethos_rerun)
         stage2       = self._run_stage2(stage1a, hitl1_result)
         self._load_scope_from_stage2(stage2)
         stage3       = self._run_stage3(stage2, user_input, hitl1_result)
@@ -556,7 +620,7 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         return result
 
     # ── HITL 1 ────────────────────────────────────────────────
-    def _run_hitl1(self, stage1b: dict) -> dict:
+    def _run_hitl1(self, stage1b: dict, ethos: dict = None) -> dict:
         console.print(Rule("[bold purple]HITL 1 — Intent Checkpoint[/bold purple]"))
 
         all_items = (
@@ -568,6 +632,24 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         if not all_items:
             console.print("[green]No ambiguities — skipping HITL 1[/green]")
             return {"resolutions": [], "assumptions_fired": []}
+
+        # inject domain clarification question if ETHOS confidence is LOW
+        if ethos and ethos.get("confidence_band") == "LOW":
+            domain_q = ethos.get("domain_clarification_question", "")
+            if domain_q:
+                console.print(Panel(
+                    f"[bold]{domain_q}[/bold]",
+                    title="[purple]ETHOS Domain Clarification (helps risk classification)[/purple]",
+                    border_style="purple"
+                ))
+                domain_answer = input("  Your answer: ").strip()
+                # store as a resolution for the re-run context
+                all_items.insert(0, {
+                    "id": "ETHOS-domain",
+                    "description": "Domain clarification for ETHOS risk classification",
+                    "clarification_question": domain_q,
+                    "priority": "P1"
+                })
 
         resolved_ids    = []
         all_resolutions = []
@@ -1248,6 +1330,20 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             console.print(f"\n[bold red]Standing non-goals (cannot be violated):[/bold red]")
             for ng in self.sm.non_goals.values():
                 console.print(f"  ✗ {ng.get('uid','')} — {ng.get('title','')}")
+        # ETHOS output at HITL 2
+        ethos = self.sm.ethos_output
+        if ethos:
+            risk_tier  = ethos.get("risk_tier", "UNKNOWN")
+            band       = ethos.get("confidence_band", "UNKNOWN")
+            score      = ethos.get("confidence_score", 0)
+            action     = ethos.get("recommended_action", "")
+            tier_color = {"LOW":"green","MEDIUM":"yellow","HIGH":"red"}.get(risk_tier,"white")
+            band_color = {"HIGH":"green","UNCERTAIN":"yellow","LOW":"red"}.get(band,"white")
+
+            console.print(f"\n[bold purple]── ETHOS GOVERNANCE CLASSIFICATION ──[/bold purple]")
+            console.print(f"  [bold]Risk Tier:[/bold]        [{tier_color}]{risk_tier}[/{tier_color}]")
+            console.print(f"  [bold]Confidence:[/bold]       {score} [{band_color}]{band}[/{band_color}]")
+            console.print(f"  [bold]Recommended action:[/bold] {action}")
 
     # ── Load requirements from 1A ─────────────────────────────
     def _load_requirements_from_1a(self, stage1a: dict):
