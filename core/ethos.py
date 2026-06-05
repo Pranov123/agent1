@@ -26,7 +26,8 @@ PATTERN_SEVERITY = {
     "financial_data":         0.9,
     "employee_monitoring":    0.9,
     "covert_surveillance":    1.0,
-    "child_users":            0.8,
+    "child_users_sensitive":  0.7,
+    "child_exploitation":     1.0,  
     "regulated_industry":     0.8,
     "pii_handling":           0.5,
     "third_party_sharing":    0.5,
@@ -39,7 +40,7 @@ HIGH_SEVERITY_PATTERNS = {
     "algorithmic_decisions",
     "covert_surveillance",
     "employee_monitoring",
-    "child_users",
+    "child_exploitation",
 }
 
 # ── Auto-escalation — specific phrases only ───────────────────
@@ -169,8 +170,18 @@ PATTERNS AND DEFINITIONS:
 - pii_handling: personal identifiable information explicitly collected
 - health_data: REGULATED health/medical data — NOT general wellness/fitness
 - financial_data: payment, banking, financial transaction data
-- employee_monitoring: explicit monitoring of employee behaviour or communications
-- child_users: product explicitly targets children under 13
+- employee_monitoring: The system EXPLICITLY tracks or records employee
+  BEHAVIOUR, COMMUNICATIONS, KEYSTROKES, SCREEN ACTIVITY, or PRODUCTIVITY.
+  DOES NOT INCLUDE: leave requests, attendance records, scheduling,
+  payroll, directories, performance reviews, or standard HR admin.
+  REQUIRES explicit words: "monitor", "track productivity",
+  "record communications", "surveillance", "keystroke", "screen capture".
+- child_users_sensitive: System collects BEHAVIOURAL data, location,
+  or communications FROM children and uses it for profiling or targeting.
+  DOES NOT INCLUDE: attendance tracking, grades, learning progress.
+  School admin tools = NOT this pattern.
+  REQUIRES explicit sensitive processing involving children.
+- child_exploitation: System targets, exploits, or harms children.
 - covert_surveillance: monitoring without user knowledge or consent
 - algorithmic_decisions: automated decisions affecting legal rights or employment
 - regulated_industry: explicitly under HIPAA, PCI, GDPR enforcement
@@ -272,25 +283,14 @@ OUTPUT FORMAT — valid JSON only, no preamble:
                 disagreement_penalty
             )
             
-        # evidence-based confidence cap
-        # short or vague inputs cannot produce high confidence
-        input_word_count = len(self._current_input.split()) if hasattr(self, '_current_input') else 10
-        evidence_cap = 1.0
-        if not patterns and domain_confidence < 0.7:
-            # no patterns found AND domain uncertain = genuinely ambiguous
-            evidence_cap = 0.55  # force into UNCERTAIN band at most
-        elif not patterns:
-            evidence_cap = 0.80  # no patterns = cap at high end of HIGH band
-
-        specificity = self._assess_input_specificity(
+        # input quality scales confidence without flattening it
+        input_quality = self._assess_input_quality(
             self._current_input if hasattr(self, '_current_input') else ""
         )
-        # specificity caps confidence — vague inputs cannot produce high confidence
-        specificity_cap = 0.4 + (specificity * 0.6)  # maps 0.2-1.0 → 0.52-1.0
-        final_cap = min(evidence_cap, specificity_cap)
-
+        # multiply rather than cap — preserves variation
         combined_confidence = round(
-            max(0.1, min(final_cap, combined_confidence)), 3
+            max(0.10, min(0.95, (combined_confidence * input_quality) - disagreement_penalty)),
+            3
         )
         
         # confidence band
@@ -307,10 +307,10 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         if auto_escalated:
             risk_tier         = RISK_HIGH
             escalation_source = "AUTO_ESCALATION"
-        elif severity_score >= 0.8:
+        elif severity_score >= 0.85:
             risk_tier         = RISK_HIGH
             escalation_source = "HIGH_SEVERITY_PATTERNS"
-        elif severity_score >= 0.4:
+        elif severity_score >= 0.45:
             risk_tier         = RISK_MEDIUM
             escalation_source = "MEDIUM_SEVERITY_PATTERNS"
         elif risk_signal == "HIGH":
@@ -320,9 +320,18 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             risk_tier         = RISK_MEDIUM
             escalation_source = "PATTERN_SIGNAL"
         elif primary_domain == "hr_workforce":
-            # HR is neutral but processes workforce data — MEDIUM baseline
+            input_quality = self._assess_input_quality(
+                self._current_input if hasattr(self, '_current_input') else ""
+            )
+            if input_quality >= 0.5:
+                risk_tier         = RISK_MEDIUM
+                escalation_source = "DOMAIN_BASELINE_HR"
+            else:
+                risk_tier         = RISK_MEDIUM
+                escalation_source = "DOMAIN_BASELINE_HR_VAGUE"
+        elif band == BAND_LOW and primary_domain == "other":
             risk_tier         = RISK_MEDIUM
-            escalation_source = "DOMAIN_BASELINE_HR"
+            escalation_source = "AMBIGUOUS_INPUT"
         else:
             risk_tier         = RISK_LOW
             escalation_source = "HEURISTIC_CLEAN"
@@ -550,34 +559,35 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         except json.JSONDecodeError:
             return {}
         
-    def _assess_input_specificity(self, raw_input: str) -> float:
+    def _assess_input_quality(self, raw_input: str) -> float:
         """
-        Returns a specificity score 0.0-1.0.
-        Short, generic inputs score low.
-        Specific, detailed inputs score high.
-        Used to cap confidence on vague inputs.
+        Returns 0.3 - 1.0 as a multiplier.
+        Scales confidence without flattening it.
+        Short vague input: 0.3-0.5 (halves confidence)
+        Detailed specific input: 0.85-1.0 (minimal reduction)
         """
-        words = raw_input.split()
+        if not raw_input:
+            return 0.4
+        words      = raw_input.split()
         word_count = len(words)
 
-        # very short inputs cannot be specific
-        if word_count < 8:
-            return 0.2
-        if word_count < 15:
-            return 0.4
-        if word_count < 25:
-            return 0.6
+        if word_count < 5:
+            base = 0.30
+        elif word_count < 10:
+            base = 0.45
+        elif word_count < 15:
+            base = 0.60
+        elif word_count < 25:
+            base = 0.75
+        else:
+            base = 0.85
 
-        # check for specific technical or domain terms
-        specific_indicators = [
-            "patient", "invoice", "employee", "transaction", "diagnosis",
-            "medical", "payment", "clinical", "financial", "monitor",
-            "track", "sync", "offline", "bluetooth", "api", "database",
-            "authentication", "encrypt", "gdpr", "hipaa", "compliance"
+        specific_terms = [
+            "patient","invoice","employee","transaction","diagnosis",
+            "medical","payment","clinical","financial","monitor",
+            "track","sync","offline","bluetooth","encrypt","gdpr",
+            "hipaa","compliance","sensor","database","authentication",
+            "biometric","surveillance","algorithm","automated","decision",
         ]
-        specificity_bonus = sum(
-            0.05 for word in specific_indicators
-            if word in raw_input.lower()
-        )
-
-        return min(1.0, 0.6 + specificity_bonus)
+        bonus = sum(0.03 for term in specific_terms if term in raw_input.lower())
+        return min(1.0, base + bonus)
