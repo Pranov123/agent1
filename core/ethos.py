@@ -33,6 +33,7 @@ PATTERN_SEVERITY = {
     "third_party_sharing":    0.5,
     "behavioural_profiling":  0.6,
     "location_tracking":      0.5,
+    "biometric_processing":   0.8,
     "data_retention":         0.3,
 }
 
@@ -189,6 +190,8 @@ PATTERNS AND DEFINITIONS:
 - third_party_sharing: data explicitly shared with third parties
 - location_tracking: precise real-time location data collected
 - behavioural_profiling: behaviour patterns analysed for profiling purposes
+- biometric_processing: facial recognition, fingerprint,
+  iris scan, voiceprint, or other biometric identifiers
 
 STRICT RULES:
 1. Only flag with DIRECT evidence — quote the input
@@ -196,6 +199,23 @@ STRICT RULES:
 3. Storing usage data is NOT behavioural_profiling
 4. Working offline is NOT data_retention
 5. If you cannot quote evidence, do NOT flag
+
+IMPORTANT NEGATIVE EXAMPLES:
+- Attendance tracking is NOT pii_handling.
+- School attendance systems are NOT pii_handling.
+- Class rosters are NOT pii_handling.
+- Grades and academic progress are NOT pii_handling.
+- Parent notifications are NOT pii_handling.
+- Learning management systems are NOT pii_handling.
+- Educational administration systems are NOT pii_handling.
+
+Only flag pii_handling when the input explicitly states:
+- collection of personal information,
+- storage of personal information,
+- sharing of personal information,
+- selling of personal information,
+- processing of personal information,
+- or handling of personally identifiable information (PII).
 
 OUTPUT FORMAT — valid JSON only, no preamble:
 {
@@ -289,7 +309,9 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         )
         # multiply rather than cap — preserves variation
         combined_confidence = round(
-            max(0.10, min(0.95, (combined_confidence * input_quality) - disagreement_penalty)),
+            max(0.10, min(0.95,
+                combined_confidence * input_quality
+            )),
             3
         )
         
@@ -320,15 +342,8 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             risk_tier         = RISK_MEDIUM
             escalation_source = "PATTERN_SIGNAL"
         elif primary_domain == "hr_workforce":
-            input_quality = self._assess_input_quality(
-                self._current_input if hasattr(self, '_current_input') else ""
-            )
-            if input_quality >= 0.5:
-                risk_tier         = RISK_MEDIUM
-                escalation_source = "DOMAIN_BASELINE_HR"
-            else:
-                risk_tier         = RISK_MEDIUM
-                escalation_source = "DOMAIN_BASELINE_HR_VAGUE"
+            risk_tier         = RISK_LOW
+            escalation_source = "HR_ADMINISTRATIVE"
         elif band == BAND_LOW and primary_domain == "other":
             risk_tier         = RISK_MEDIUM
             escalation_source = "AMBIGUOUS_INPUT"
@@ -432,12 +447,32 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         Helps reviewers understand WHY a project is risky.
         """
         if auto_escalated:
-            if "healthcare" in escalation_reason or "medical" in escalation_reason:
-                return "REGULATORY"
-            if "financial" in escalation_reason or "fintech" in escalation_reason:
-                return "REGULATORY"
-            if "surveillance" in escalation_reason or "monitoring" in escalation_reason:
+            reason = escalation_reason.lower()
+
+            if any(x in reason for x in [
+                "monitor",
+                "surveillance",
+                "employee",
+                "communications"
+            ]):
                 return "SURVEILLANCE"
+
+            if any(x in reason for x in [
+                "financial",
+                "bank",
+                "payment",
+                "fintech"
+            ]):
+                return "REGULATORY"
+
+            if any(x in reason for x in [
+                "medical",
+                "clinical",
+                "healthcare",
+                "patient"
+            ]):
+                return "REGULATORY"
+
             return "REGULATORY"
 
         if not patterns:
@@ -446,6 +481,11 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         # check for highest severity pattern type
         pattern_names = {p.get("pattern") for p in patterns}
 
+        if (
+            "algorithmic_decisions" in pattern_names
+            and primary_domain == "hr_workforce"
+        ):
+            return "EMPLOYMENT_DECISION"
         if "algorithmic_decisions" in pattern_names:
             return "ALGORITHMIC_DECISION"
         if "covert_surveillance" in pattern_names or "employee_monitoring" in pattern_names:
@@ -454,7 +494,9 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             return "REGULATORY"
         if "financial_data" in pattern_names:
             return "REGULATORY"
-        if "child_users" in pattern_names:
+        if "child_users_sensitive" in pattern_names:
+            return "SAFETY"
+        if "child_exploitation" in pattern_names:
             return "SAFETY"
         if "pii_handling" in pattern_names or "behavioural_profiling" in pattern_names:
             return "PRIVACY"
@@ -541,7 +583,11 @@ OUTPUT FORMAT — valid JSON only, no preamble:
             "saas":         "What industry or business type is this primarily serving?",
             "hardware_iot": "Is this a consumer device or industrial/enterprise?",
             "social":       "Is this for general public or a specific community?",
-            "hr_workforce": "Will this system make or inform decisions that affect employees?",
+            "hr_workforce": (
+                "Does the system only manage HR administration "
+                "(leave, payroll, scheduling), or does it monitor "
+                "employees or make employment decisions?"
+            ),
         }
         return questions.get(
             domain,
@@ -572,15 +618,15 @@ OUTPUT FORMAT — valid JSON only, no preamble:
         word_count = len(words)
 
         if word_count < 5:
-            base = 0.30
+            base = 0.65
         elif word_count < 10:
-            base = 0.45
+            base = 0.82
         elif word_count < 15:
-            base = 0.60
+            base = 0.90
         elif word_count < 25:
-            base = 0.75
+            base = 0.95
         else:
-            base = 0.85
+            base = 1.0
 
         specific_terms = [
             "patient","invoice","employee","transaction","diagnosis",
